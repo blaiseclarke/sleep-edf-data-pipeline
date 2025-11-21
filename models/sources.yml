@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: eeg_raw
+    database: EEG_ANALYTICS
+    schema: RAW
+    tables:
+      - name: SLEEP_EPOCHS
