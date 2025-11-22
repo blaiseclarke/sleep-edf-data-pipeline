@@ -21,7 +21,7 @@ with
             * 0.5 as deep_sleep_minutes,
             (sum(case when sleep_stage = 'N3' then 1 else 0 end) * 0.5) / nullif(
                 (sum(case when sleep_stage != 'W' then 1 else 0 end) * 0.5), 0
-            ) as deep_sleep_pct,
+            ) as deep_sleep_percentage,
 
             -- light sleep minutes and percentage
             sum(case when sleep_stage in ('N1', 'N2') then 1 else 0 end)
@@ -30,14 +30,14 @@ with
                 sum(case when sleep_stage in ('N1', 'N2') then 1 else 0 end) * 0.5
             ) / nullif(
                 (sum(case when sleep_stage != 'W' then 1 else 0 end) * 0.5), 0
-            ) as light_sleep_pct,
+            ) as light_sleep_percentage,
 
             -- REM sleep minutes and percentage
             sum(case when sleep_stage = 'REM' then 1 else 0 end)
             * 0.5 as rem_sleep_minutes,
             (sum(case when sleep_stage = 'REM' then 1 else 0 end) * 0.5) / nullif(
                 (sum(case when sleep_stage != 'W' then 1 else 0 end) * 0.5), 0
-            ) as rem_sleep_pct,
+            ) as rem_sleep_percentage,
 
             -- power metrics
             avg(delta_moving_avg) as avg_nightly_delta_power,
