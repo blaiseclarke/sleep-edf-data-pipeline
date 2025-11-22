@@ -8,7 +8,7 @@ Objective for this project was to create a scalable ELT pipeline to turn raw EEG
 ### Architecture
 <img width="1270" height="269" alt="Screenshot 2025-11-22 at 8 06 29 AM" src="https://github.com/user-attachments/assets/5ecabb9a-6b37-460e-9959-8b0dbab518a9" />
 
-**Source:** PhysioNet Sleep-EDF Database (ingestion)
+**Source:** [PhysioNet Sleep-EDF Database](https://www.physionet.org/content/sleep-edfx/1.0.0/) (ingestion)
 
 **Extraction:** Python (signal processing and feature extraction)
 
