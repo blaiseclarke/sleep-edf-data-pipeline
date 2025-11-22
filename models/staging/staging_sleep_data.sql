@@ -6,7 +6,7 @@ with
             {{ dbt_utils.generate_surrogate_key(["subject_id", "epoch_idx"]) }}
             as epoch_id,
 
-            coalesce(cast(subject_id as varchar), '1') as subject_id,
+            cast(subject_id as varchar) as subject_id,
             cast(epoch_idx as int) as epoch_idx,
             cast(stage as varchar) as sleep_stage,
 

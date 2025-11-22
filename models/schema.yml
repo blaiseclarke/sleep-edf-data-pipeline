@@ -1,0 +1,42 @@
+version: 2
+
+models:
+  - name: staging_sleep_data
+    columns:
+      - name: subject_id
+        tests:
+          - not_null
+      - name: epoch_idx
+        tests:
+          - not_null
+      - name: epoch_id
+        tests:
+          - not_null
+          - unique
+      - name: delta_power_uv
+        tests:
+          - not_null
+      - name: alpha_power_uv
+        tests:
+          - not_null
+      - name: sigma_power_uv
+        tests:
+          - not_null
+      - name: theta_power_uv
+        tests:
+          - not_null
+      - name: beta_power_uv
+        tests:
+          - not_null
+      - name: sleep_stage
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - 'W'
+                  - 'N1'
+                  - 'N2'
+                  - 'N3'
+                  - 'REM'
+                  - 'NAN'
+                  - 'MOVE'
