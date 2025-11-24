@@ -40,8 +40,11 @@ with
             ) as rem_sleep_percentage,
 
             -- power metrics
-            avg(delta_moving_avg) as avg_nightly_delta_power,
-            avg(sigma_moving_avg) as avg_nightly_sigma_power
+            avg(delta_moving_avg) as avg_delta_power,
+            avg(sigma_moving_avg) as avg_sigma_power,
+            avg(beta_moving_avg) as avg_beta_power,
+            avg(theta_moving_avg) as avg_theta_power,
+            avg(alpha_moving_avg) as avg_alpha_power
 
         from epoch_data
         group by subject_id

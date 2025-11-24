@@ -19,11 +19,33 @@ with
                 rows between 4 preceding and current row
             ) as sigma_moving_avg,
 
+            -- Active wake
+            avg(beta_power_uv) over (
+                partition by subject_id
+                order by epoch_idx
+                rows between 4 preceding and current row
+            ) as beta_moving_avg,
+
+            -- N1/REM
+            avg(theta_power_uv) over (
+                partition by subject_id
+                order by epoch_idx
+                rows between 4 preceding and current row
+            ) as theta_moving_avg,
+
+            -- Wake
+            avg(alpha_power_uv) over (
+                partition by subject_id
+                order by epoch_idx
+                rows between 4 preceding and current row
+            ) as alpha_moving_avg,
+
             lag(sleep_stage) over (
                 partition by subject_id order by epoch_idx
             ) as previous_stage,
 
-            -- Was there a wake up?
+
+            -- Was there a transition in sleep stage?
             case
                 when
                     lag(sleep_stage) over (partition by subject_id order by epoch_idx)
