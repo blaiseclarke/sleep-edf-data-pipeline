@@ -40,11 +40,6 @@ with
                 rows between 4 preceding and current row
             ) as alpha_moving_avg,
 
-            lag(sleep_stage) over (
-                partition by subject_id order by epoch_idx
-            ) as previous_stage,
-
-
             -- Was there a transition in sleep stage?
             case
                 when
