@@ -46,7 +46,7 @@ Implemented schema tests to ensure reliability and quality.
 
 ### Results
 Processed batch of single ~24-hour recordings from 10 subjects from the PhysioNet Sleep-EDF database.
-Results include number of awakenings, light/deep/REM sleep architecture, and average delta and sigma power.
+Results include number of awakenings, light/deep/REM sleep architecture, and average power by frequency band.
 
 <img width="991" height="717" alt="Screenshot 2025-11-23 at 9 46 50 PM" src="https://github.com/user-attachments/assets/bdfa5260-817b-4d23-a8c6-bb4967a9d31a" />
 
