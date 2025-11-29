@@ -19,7 +19,7 @@ def process_subject(subject_id):
         # Loading raw data
         raw = mne.io.read_raw_edf(psg_file, preload=True, verbose=False)
         annotations = mne.read_annotations(hypnogram_file)
-        raw.set_annotations(annotations, emit_warning=False) # why is emit_warning set to False?
+        raw.set_annotations(annotations, emit_warning=False)
 
         # Renaming channel names
         mapping = {
