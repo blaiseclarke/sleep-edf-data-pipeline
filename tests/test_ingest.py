@@ -41,7 +41,7 @@ def test_negative_power_validation():
     with pytest.raises(ValidationError) as excinfo:
         SleepEpoch(**data)
 
-    assert "Power values must be non-negative" in str(excinfo.value)
+    assert "Input should be greater than 0" in str(excinfo.value)
 
 def test_invalid_stage_label():
     """
