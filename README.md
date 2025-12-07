@@ -5,7 +5,7 @@ Converts raw Sleep-EDF EEG recordings into sleep-epoch metrics and summary stati
 Python extracts and cleans -> Snowflake storage -> dbt models create clinical insights
 
 
-## Why This Exists
+### Why This Exists
 Clinical data is usually trapped in raw, heavy file formats like EDF, which can be difficult to query at scale. 
 This project creates a scalable ELT pipeline to turn raw EEG signals into queryable sleep metrics.
 
