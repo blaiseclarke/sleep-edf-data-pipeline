@@ -4,7 +4,7 @@ from schemas import SleepEpoch
 
 def test_valid_sleep_epoch():
     """
-    Docstring for test_valid_sleep_epoch
+    Testing for valid data in SleepEpoch.
     """
 
     data = {
@@ -24,7 +24,7 @@ def test_valid_sleep_epoch():
 
 def test_negative_power_validation():
     """
-    Docstring for test_negative_power_validation
+    Testing for negative band power.
     """
 
     data = {
@@ -45,7 +45,7 @@ def test_negative_power_validation():
 
 def test_invalid_stage_label():
     """
-    Docstring for test_invalid_stage_label
+    Testing for invalid sleep stage label.
     """
 
     data = {
