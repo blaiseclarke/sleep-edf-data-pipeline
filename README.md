@@ -13,18 +13,18 @@ This project creates a scalable ELT pipeline to turn raw EEG signals into querya
 ### Architecture
 <img width="1270" height="269" alt="Screenshot 2025-11-22 at 8 06 29 AM" src="https://github.com/user-attachments/assets/5ecabb9a-6b37-460e-9959-8b0dbab518a9" />
 
-**Source:** [PhysioNet Sleep-EDF Database](https://www.physionet.org/content/sleep-edfx/1.0.0/) (ingestion)
+**Source:** [PhysioNet Sleep-EDF Database](https://www.physionet.org/content/sleep-edfx/1.0.0/)
 
 **Ingestion:** Python + MNE-Python (signal processing and feature extraction)
 
-**Warehousing:** Snowflake (storage and computing)
+**Warehousing:** Snowflake
 
-**Transformation:** dbt (modeling and testing)
+**Transformation:** dbt
 
 ### Engineering
-This pipeline was upgraded from a script-based workflow to a production-grade data system:
-* **Orchestration (Prefect):** Python extraction logic wrapped in a Prefect flow, providing structured logging and retries for failed tasks.
-* **Data Contracts (Pydantic):** Developed strict schema to validate every epoch before ingestion occurs.
+This pipeline was upgraded from a script-based workflow to a stronger data system:
+* **Orchestration (Prefect):** Python extraction logic wrapped in a Prefect flow, providing logging and retries for failed tasks.
+* **Data Contracts (Pydantic):** Developed schema to validate every epoch before ingestion occurs.
 * **Automated Testing (Pytest):** Unit tests to validate ingestion logic and constraints.
 * **CI/CD (Github Actions):** Test suite is triggered on every push.
 
@@ -32,21 +32,39 @@ This pipeline was upgraded from a script-based workflow to a production-grade da
 
 ### Quick Start
 ```bash
-# Extract raw EDF to CSV
-python3 ingest_data.py
+# Prerequisites 
+# Python 3.10+
+# Snowflake account (standard or trial)
+# Prefect Cloud (optional)
+
+# Clone repo
+git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline
+cd sleep-edf-data-pipeline
+
+# Install dependencies (MNE, Prefect, dbt-snowflake, Pydantic)
+pip install -r requirements.txt
+
+# Run these in terminal to set environment vars
+# Make sure ~/.dbt/profiles.yml is configured to read these
+export SNOWFLAKE_ACCOUNT="xy12345.us-east-1"
+export SNOWFLAKE_USER="your_username"
+export SNOWFLAKE_PASSWORD="your_password"
+export SNOWFLAKE_WAREHOUSE="COMPUTE_WH"
 
 # Run ingestion pipeline
 python3 pipeline.py
 
 # Execute warehouse transformations
-dbt run && dbt test
+dbt deps
+dbt run
+dbt test
 ```
 
 Outputs:
-```bash
-sleep_data.csv           # raw extracted epochs
-sleep_data_validated.csv # validated epochs
-```
+* Raw extracted epochs - `sleep_data.csv `
+* Validated epochs - `sleep_data_validated.csv`
+* Snowflake tables - `staging_sleep_data`, `sleep_metrics`, `sleep_summary`
+* Prefect dashboard - View at `http://127.0.0.1:4200`
 
 ### Extraction (Python/MNE)
 Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment.
@@ -68,10 +86,10 @@ Pipeline structure:
 - Staging
   - Standardized column naming and explicit type casting
 - Intermediate
-  - Rolling power averages over five sliding epochs, for smoothing deviations and artifacts
+  - Rolling power averages over sliding epochs, to smooth deviations and artifacts
   - Sleep stage transition detection
 - Sleep Summary
-  - Compressed epoch rows into a single patient summary table
+  - Compressed epoch rows into a single summary table
   - Calculated sleep architecture: deep/light/REM %, awakenings, and average power
 
 ### Data Integrity (dbt)
@@ -81,7 +99,7 @@ Pipeline structure:
 - Tests run automatially via CI
 
 ### Results
-Processed batch of single ~24-hour recordings from 10 subjects from the PhysioNet Sleep-EDF database.
+Processed batch of single ~24-hour recordings from subjects from the PhysioNet Sleep-EDF database.
 Results include:
 - Total sleep time and architecture breakdown
 - Number of awakenings
