@@ -36,6 +36,7 @@ This pipeline was upgraded from a script-based workflow to a stronger data syste
 # Python 3.10+
 # Snowflake account (standard or trial)
 # Prefect Cloud (optional)
+# dbt
 
 # Clone repo
 git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline
