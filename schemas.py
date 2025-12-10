@@ -3,7 +3,10 @@ from typing import Optional
 
 class SleepEpoch(BaseModel):
     """
-    Docstring for SleepEpoch
+    Defines the data contract for a single sleep epoch.
+    
+    This schema enforces data types, sleep stage labels, and that all power 
+    bands must be positive.
     """
 
     subject_id: int

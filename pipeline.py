@@ -6,6 +6,15 @@ from pydantic import ValidationError
 
 @task(retries=2, retry_delay_seconds=10)
 def extract_subject_data(subject_id: int) -> pd.DataFrame:
+    """
+    Locates and extracts subject data from the local EDF files.
+
+    Handles signal processing using MNE-Python, channel renaming, and bandpass
+    filtering.
+    
+    :param subject_id: subject ID for the file.
+    :return DataFrame to be sent to Pydantic for validation, then ingestion.
+    """
     logger = get_run_logger()
     logger.info(f"Starting extraction for subject {subject_id}")
 
@@ -20,12 +29,13 @@ def extract_subject_data(subject_id: int) -> pd.DataFrame:
 @task
 def validate_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Docstring for validate_data
-    
-    :param df: Description
-    :type df: pd.DataFrame
-    :return: Description
-    :rtype: DataFrame
+    Validates raw DataFrame records against the Pydantic SleepEpoch constraints.
+
+    Iterates through records, catching validation errors, and logging them
+    as warnings.
+
+    :param df: DataFrame containing band power data for a batch of epochs.
+    :return: DataFrame containing records that have passed validation.
     """
     
     logger = get_run_logger()
@@ -44,6 +54,12 @@ def validate_data(df: pd.DataFrame) -> pd.DataFrame:
 
 @flow(name='Sleep-EDF Ingestion Pipeline')
 def run_ingestion_pipeline():
+    """
+    Executes the ingestion pipeline as the Prefect starting point.
+
+    Orchestrates extraction, validation, and loading tasks across all 
+    subject files.
+    """
     logger = get_run_logger()
     all_data = []
 

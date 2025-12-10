@@ -4,7 +4,7 @@ from schemas import SleepEpoch
 
 def test_valid_sleep_epoch():
     """
-    Testing for valid data in SleepEpoch.
+    Ensures data sample that meets constraints is successfully validated.
     """
 
     data = {
@@ -24,7 +24,7 @@ def test_valid_sleep_epoch():
 
 def test_negative_power_validation():
     """
-    Testing for negative band power.
+    Ensures Pydantic schema raises a ValidationError when a negative power band is seen.
     """
 
     data = {
@@ -45,7 +45,7 @@ def test_negative_power_validation():
 
 def test_invalid_stage_label():
     """
-    Testing for invalid sleep stage label.
+    Confirms that the sleep stage validation rejects unsupported sleep stage labels.
     """
 
     data = {
