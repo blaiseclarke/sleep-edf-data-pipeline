@@ -45,9 +45,6 @@ cd sleep-edf-data-pipeline
 # Install dependencies (MNE, Prefect, dbt-snowflake, Pydantic)
 pip install -r requirements.txt
 
-# Run ingestion pipeline
-python3 pipeline.py
-
 # Create a .env file in root directory and add your Snowflake details:
 # SNOWFLAKE_USER=your_user
 # SNOWFLAKE_PASSWORD=your_password
@@ -55,6 +52,9 @@ python3 pipeline.py
 # SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 # SNOWFLAKE_DATABASE=EEG_ANALYTICS
 # SNOWFLAKE_SCHEMA=RAW
+
+# Run ingestion pipeline
+python3 pipeline.py
 
 # Execute warehouse transformations
 dbt deps
