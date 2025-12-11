@@ -3,7 +3,7 @@
 
 Converts raw Sleep-EDF EEG recordings into sleep-epoch metrics and summary statistics.
 
-Python extracts and cleans -> Snowflake storage -> dbt models create clinical insights
+Python extracts and cleans -> automated Snowflake storage -> dbt models create clinical insights
 
 
 ### Why This Exists
