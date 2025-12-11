@@ -36,7 +36,7 @@ This pipeline was upgraded from a script-based workflow to a stronger data syste
 # Python 3.10+
 # Snowflake account (standard or trial)
 # Prefect Cloud (optional)
-# dbt
+# dbt (requires ~/.dbt/profiles.yml configured for Snowflake)
 
 # Clone repo
 git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline
@@ -45,15 +45,14 @@ cd sleep-edf-data-pipeline
 # Install dependencies (MNE, Prefect, dbt-snowflake, Pydantic)
 pip install -r requirements.txt
 
-# Run these in terminal to set environment vars
-# Make sure ~/.dbt/profiles.yml is configured to read these
-export SNOWFLAKE_ACCOUNT="xy12345.us-east-1"
-export SNOWFLAKE_USER="your_username"
-export SNOWFLAKE_PASSWORD="your_password"
-export SNOWFLAKE_WAREHOUSE="COMPUTE_WH"
-
 # Run ingestion pipeline
 python3 pipeline.py
+
+# Manual step: upload to Snowflake
+# 1. Create a database called EEG_ANALYTICS
+# 2. Create a schema named RAW
+# 3. Upload sleep_data_validated.csv into the schema
+# 4. Name the table SLEEP_EPOCHS so dbt can find it
 
 # Execute warehouse transformations
 dbt deps
