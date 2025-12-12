@@ -90,7 +90,7 @@ def load_to_snowflake(df, table_name="SLEEP_EPOCHS"):
             account=account,
             warehouse=warehouse,
             database=database,
-            schema=schema,
+            schema=schema
         )
 
         logger.info(f"Uploading {len(df)} rows to {database}.{schema}.{table_name}...")
