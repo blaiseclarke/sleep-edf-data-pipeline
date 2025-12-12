@@ -95,7 +95,7 @@ def process_subject(subject_id):
 def calculate_band_power(psd, frequencies, fmin, fmax):
         idx = np.logical_and(frequencies >= fmin, frequencies <= fmax)
 
-        power = psd[:, 0, idx].mean(axis=1) * 1e12
+        power = psd[:, :, idx].mean(axis=1) * 1e12
         return power
 
 def main():
