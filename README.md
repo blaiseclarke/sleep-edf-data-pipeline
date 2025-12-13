@@ -1,51 +1,57 @@
-## Sleep-EDF Analytics Pipeline
-#### Python, Prefect, MNE-Python, Pydantic, Snowflake, dbt, SQL
+# Cloud-Native Sleep-EDF Analytics Pipeline
 
-Converts raw Sleep-EDF EEG recordings into sleep-epoch metrics and summary statistics.
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![Snowflake](https://img.shields.io/badge/Snowflake-Data_Warehouse-29B5E8?logo=snowflake&logoColor=white)
+![dbt](https://img.shields.io/badge/dbt-Transformation-FF694B?logo=dbt&logoColor=white)
+![Prefect](https://img.shields.io/badge/Prefect-Orchestration-070E28?logo=prefect&logoColor=white)
+![CI/CD](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=github-actions&logoColor=white)
 
-Python extracts and cleans -> automated Snowflake storage -> dbt models create clinical insights
+### Project Overview
+This project is an end-to-end ELT pipeline that transforms raw physiological signal data (Sleep-EDF) into queryable sleep metrics. It replaces manual, script-based workflows with a modern data stack, enabling scalable query performance, automated data quality checks, and reliable warehousing.
 
+**The Problem:** Clinical EEG data is typically locked in heavy binary formats (EDF), making analysis and SQL querying next to impossible.
+**The Solution:** An automated pipeline that ingests, validates, and warehouses sleep data, allowing access to insights via Snowflake and dbt.
 
-### Why This Exists
-Clinical data is usually trapped in raw, heavy file formats like EDF, which can be difficult to query at scale. 
-This project creates a scalable ELT pipeline to turn raw EEG signals into queryable sleep metrics.
+---
 
 ### Architecture
-<img width="1270" height="269" alt="Screenshot 2025-11-22 at 8 06 29 AM" src="https://github.com/user-attachments/assets/5ecabb9a-6b37-460e-9959-8b0dbab518a9" />
+<img width="1270" alt="Architecture Diagram" src="https://github.com/user-attachments/assets/5ecabb9a-6b37-460e-9959-8b0dbab518a9" />
 
-**Source:** [PhysioNet Sleep-EDF Database](https://www.physionet.org/content/sleep-edfx/1.0.0/)
+| Stage | Tech Stack | Description |
+| :--- | :--- | :--- |
+| **Source** | **PhysioNet** | Sleep-EDF Database (Raw .edf files) |
+| **Ingestion** | **Python + MNE** | Signal processing, FFT, and feature extraction |
+| **Orchestration** | **Prefect** | Flow management, retries, and observability |
+| **Warehousing** | **Snowflake** | Scalable cloud storage for raw and modeled data |
+| **Transformation** | **dbt** | SQL-based modeling for clinical insights |
 
-**Ingestion:** Python + MNE-Python (signal processing and feature extraction)
+---
 
-**Warehousing:** Snowflake
+### Engineering Highlights
 
-**Transformation:** dbt
+* **🛡 Data Contracts (Pydantic):** Defined strict schemas to validate every epoch before ingestion. If a signal doesn't match the schema, the pipeline fails gracefully before corrupting the warehouse.
+* **⚡ Automated CI/CD:** GitHub Actions triggers the `pytest` suite on every push, ensuring no regressions in signal processing logic.
+* **🧪 Data Integrity Tests:** Custom dbt tests ensure logical consistency (e.g., *Band power must be positive*, *Sleep stages must be standard clinical codes*)
+* **🔄 Observability:** Prefect dashboard provides real-time logging and monitoring for all pipeline tasks.
 
-### Engineering
-This pipeline was upgraded from a script-based workflow to a stronger data system:
-* **Orchestration (Prefect):** Python extraction logic wrapped in a Prefect flow, providing logging and retries for failed tasks.
-* **Data Contracts (Pydantic):** Developed schema to validate every epoch before ingestion occurs.
-* **Automated Testing (Pytest):** Unit tests to validate ingestion logic and constraints.
-* **CI/CD (Github Actions):** Test suite is triggered on every push.
+<img width="986" alt="Prefect Dashboard" src="https://github.com/user-attachments/assets/71dabb27-486a-4b49-9dce-5d615d02172a" />
 
-<img width="986" height="497" alt="Screenshot 2025-12-09 at 10 57 55 PM" src="https://github.com/user-attachments/assets/71dabb27-486a-4b49-9dce-5d615d02172a" />
+---
 
 ### Quick Start
-```bash
-# Prerequisites 
-# Python 3.10+
-# Snowflake account (standard or trial)
-# Prefect Cloud (optional)
-# dbt (requires ~/.dbt/profiles.yml configured for Snowflake)
 
-# Clone repo
-git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline
+**Prerequisites:** Python 3.10+, Snowflake Account, dbt
+
+```bash
+# 1. Clone repo
+git clone [https://github.com/blaiseclarke/sleep-edf-data-pipeline](https://github.com/blaiseclarke/sleep-edf-data-pipeline)
 cd sleep-edf-data-pipeline
 
-# Install dependencies (MNE, Prefect, dbt-snowflake, Pydantic)
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# Create a .env file in root directory and add your Snowflake details:
+# 3. Configure environment
+# Create a .env file in root directory with your Snowflake credentials:
 # SNOWFLAKE_USER=your_user
 # SNOWFLAKE_PASSWORD=your_password
 # SNOWFLAKE_ACCOUNT=your_account_identifier
@@ -53,60 +59,53 @@ pip install -r requirements.txt
 # SNOWFLAKE_DATABASE=EEG_ANALYTICS
 # SNOWFLAKE_SCHEMA=RAW
 
-# Run ingestion pipeline
+# 4. Run ingestion pipeline
 python3 pipeline.py
 
-# Execute warehouse transformations
+# 5. Execute warehouse transformations
 dbt deps
 dbt run
 dbt test
 ```
 
-Outputs:
-* Raw extracted epochs - `sleep_data.csv `
-* Validated epochs - `sleep_data_validated.csv`
-* Snowflake tables - `staging_sleep_data`, `sleep_metrics`, `sleep_summary`
-* Prefect dashboard - View at `http://127.0.0.1:4200`
+---
 
-### Extraction (Python/MNE)
-Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment.
+### Technical Deep Dive
 
-Features extracted:
-- Power spectral density -> delta, theta, alpha, sigma, beta bands
-- Labels mapped to standardized sleep stages: `W, N1, N2, N3, REM, MOVE, NAN`
-- Configurable epochs, ~24 hours per subject
-- *Current note:* `preload=True` speeds up FFT, but increases memory usage. May require batching for large datasets.
+#### 1. Extraction (Python/MNE)
+Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. This handles the heavy lifting of signal processing before data ever hits the warehouse.
 
-### Warehousing (Snowflake)
-Loaded epoched extraction CSV data into Snowflake
+* **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands.
+* **Standardization:** Maps raw annotations to standardized clinical sleep stages: `W, N1, N2, N3, REM, MOVE, NAN`.
+* **Performance Optimization:** Utilizes `preload=True` to speed up FFT computations, with configurable batching for larger subject sets.
 
-Allows for the pipeline to scale without a need for refactoring or local compute
+#### 2. Warehousing (Snowflake)
+Data is loaded into Snowflake to separate compute from storage. This allows the pipeline to scale without refactoring local memory constraints or ingestion logic.
 
-### Transformation (dbt)
-Pipeline structure:
+#### 3. Transformation (dbt)
+The dbt project creates a trusted data lineage, transforming raw logs into analytics-ready models:
 
-- Staging
-  - Standardized column naming and explicit type casting
-- Intermediate
-  - Rolling power averages over sliding epochs, to smooth deviations and artifacts
-  - Sleep stage transition detection
-- Sleep Summary
-  - Compressed epoch rows into a single summary table
-  - Calculated sleep architecture: deep/light/REM %, awakenings, and average power
+* **Staging (`stg_sleep_data`):** Handles column standardization and explicit type casting.
+* **Intermediate (`int_power_rolling`):** Calculates rolling power averages over sliding epochs to smooth out signal artifacts and deviations.
+* **Marts (`sleep_summary`):** Aggregates data into clinical insights:
+    * Sleep Architecture (Deep vs. Light vs. REM %)
+    * Awakening counts
+    * Average power across frequency bands
 
-### Data Integrity (dbt)
-- Unique and not-null tests for `epoch_id` to prevent duplication.
-- Accepted values for sleep stages to ensure consistency with Pydantic constraints.
-- Band powers must be positive floats
-- Tests run automatially via CI
+#### 4. Data Integrity (Testing)
+Reliability is enforced through a suite of automated tests:
+* **Uniqueness:** `epoch_id` checked to prevent duplication.
+* **Constraints:** Sleep stages validated against accepted values defined in Pydantic.
+* **Logic:** Band powers must be positive floats; `null` checks on critical timestamps.
+
+---
 
 ### Results
-Processed batch of single ~24-hour recordings from subjects from the PhysioNet Sleep-EDF database.
-Results include:
-- Total sleep time and architecture breakdown
-- Number of awakenings
-- Average power across EEG bands
+The pipeline successfully processed a batch of ~24-hour recordings from the PhysioNet Sleep-EDF database.
 
-<img width="991" height="717" alt="Screenshot 2025-11-23 at 9 46 50 PM" src="https://github.com/user-attachments/assets/bdfa5260-817b-4d23-a8c6-bb4967a9d31a" />
+**Generated Insights:**
+* Total sleep time and architecture breakdown
+* Frequency of nocturnal awakenings
+* Average spectral power distribution across EEG bands
 
-
+<img width="991" alt="Results Graph" src="https://github.com/user-attachments/assets/bdfa5260-817b-4d23-a8c6-bb4967a9d31a" />
