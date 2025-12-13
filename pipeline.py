@@ -60,7 +60,7 @@ def validate_data(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(valid_records)
 
 @task
-def load_to_snowflake(df, table_name="SLEEP_EPOCHS"):
+def load_subject_to_snowflake(df, subject_id, table_name="SLEEP_EPOCHS"):
     """
     Loads a pandas DataFrame directly into Snowflake.
     
@@ -82,39 +82,41 @@ def load_to_snowflake(df, table_name="SLEEP_EPOCHS"):
 
     logger.info(f"Connecting to Snowflake account {account}...")
 
-    try:
-        # Establish connection
-        conn = snowflake.connector.connect(
-            user=user,
-            password=password,
-            account=account,
-            warehouse=warehouse,
-            database=database,
-            schema=schema
-        )
+    # Establish connection
+    conn = snowflake.connector.connect(
+        user=user,
+        password=password,
+        account=account,
+        warehouse=warehouse,
+        database=database,
+        schema=schema
+    )
 
-        logger.info(f"Uploading {len(df)} rows to {database}.{schema}.{table_name}...")
+    try:
+        cursor = conn.cursor()
+        try:
+            delete_query = f"DELETE FROM {table_name} WHERE SUBJECT_ID = {subject_id}"
+            logger.info(f"Clearing existing data for Subject {subject_id}...")
+            cursor.execute(delete_query)
+        except Exception as e:
+            logger.warning(f"Could not clear data: {e}")
         
         success, n_chunks, n_rows, _ = write_pandas(
-            conn, 
-            df, 
-            table_name.upper(), 
+            conn,
+            df,
+            table_name.upper(),
             auto_create_table=True,
-            overwrite=True          # Set to True if you want to replace data every run
+            overwrite=False
         )
-        
-        if success:
-            logger.info(f"Successfully loaded {n_rows} rows to Snowflake.")
-        else:
-            logger.error("Upload failed.")
-            
-    except Exception as e:
-        logger.error(f"Failed to load data to Snowflake: {e}")
-        raise e
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
+        if success:
+            logger.info(f"Subject {subject_id}: Loaded {n_rows} rows.")
+        else:
+            raise Exception("Snowflake upload failed.")                
+    finally:
+        conn.close()
+
+        
 @flow(name='Sleep-EDF Ingestion Pipeline')
 def run_ingestion_pipeline():
     """
@@ -124,26 +126,21 @@ def run_ingestion_pipeline():
     subject files.
     """
     logger = get_run_logger()
-    all_data = []
 
-    # Iterate through subjects
+    # Iterate through subject recordings
     for subject_id in range(STARTING_SUBJECT, ENDING_SUBJECT + 1):
         raw_df = extract_subject_data(subject_id)
 
-        if not raw_df.empty:
-            clean_df = validate_data(raw_df)
-            all_data.append(clean_df)
+        if raw_df.empty:
+            continue
 
-    if all_data:
-        final_df = pd.concat(all_data, ignore_index=True)
-        final_df.to_csv("sleep_data_validated.csv", index=False)
+        clean_df = validate_data(raw_df)
 
-        final_df.columns = [c.upper() for c in final_df.columns]
-        load_to_snowflake(final_df, table_name="SLEEP_EPOCHS")
+        clean_df.columns = [c.upper() for c in clean_df.columns]
+        load_subject_to_snowflake(clean_df, subject_id)
+    
+    logger.info("Pipeline finished!")
 
-        logger.info(f"Pipeline finished! Exported {len(final_df)} validated rows.")
-    else:
-        logger.warning("No data processed.")
 
 if __name__ == "__main__":
     run_ingestion_pipeline()
