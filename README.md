@@ -49,7 +49,7 @@ Docker Compose is recommended for reproducible, containerized execution.
 - Python 3.10+ *(for host execution)*
 - Docker *(Docker Desktop recommended)*
 - Snowflake account
-- dbt
+- dbt-core (pip install dbt-snowflake)
 
 #### Option 1: Docker Compose
 
@@ -73,9 +73,10 @@ SNOWFLAKE_SCHEMA=RAW
 docker compose up --build
 
 # 4. Transformations
-dbt deps
-dbt run
-dbt test
+# Point dbt to the local profiles.yml
+dbt deps --profiles-dir .
+dbt run --profiles-dir .
+dbt test --profiles-dir .
 
 # Note: dbt transformations are executed after ingestion and connect directly to Snowflake.
 ```
@@ -101,9 +102,10 @@ export SNOWFLAKE_SCHEMA=RAW
 python pipeline.py
 
 # 5. Transformations
-dbt deps
-dbt run
-dbt test
+# Point dbt to the local profiles.yml
+dbt deps --profiles-dir .
+dbt run --profiles-dir .
+dbt test --profiles-dir .
 
 # Note: dbt transformations are executed after ingestion and connect directly to Snowflake.
 ```
