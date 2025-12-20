@@ -5,7 +5,7 @@
 ![Snowflake](https://img.shields.io/badge/Snowflake-Data_Warehouse-29B5E8?logo=snowflake&logoColor=white)
 ![dbt](https://img.shields.io/badge/dbt-Transformation-FF694B?logo=dbt&logoColor=white)
 ![Prefect](https://img.shields.io/badge/Prefect-Orchestration-070E28?logo=prefect&logoColor=white)
-![CI/CD](https://img.shields.io/badge/GitHub_Actions-CI%2FCD-2088FF?logo=github-actions&logoColor=white)
+![CI](https://img.shields.io/badge/GitHub_Actions-CI-2088FF?logo=github-actions&logoColor=white)
 
 ### Project Overview
 This project is an end-to-end ELT pipeline that transforms raw physiological signal data (Sleep-EDF) into queryable sleep metrics. It replaces manual, script-based workflows with a modern data stack, enabling scalable query performance, automated data quality checks, and reliable warehousing.
@@ -32,7 +32,7 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 ### Engineering Highlights
 
 * **🛡 Data Contracts (Pydantic):** Defined strict schemas to validate every epoch before ingestion. If a signal doesn't match the schema, the pipeline fails gracefully before corrupting the warehouse.
-* **⚡ Automated CI/CD:** GitHub Actions triggers the `pytest` suite on every push, ensuring no regressions in signal processing logic.
+* **⚡ Automated CI:** GitHub Actions triggers the `pytest` suite on every push, ensuring no regressions in signal processing logic.
 * **🧪 Data Integrity Tests:** Custom dbt tests ensure logical consistency (e.g., *Band power must be positive*, *Sleep stages must be standard clinical codes*)
 * **🔄 Observability:** Prefect dashboard provides real-time logging and monitoring for all pipeline tasks.
 
@@ -45,17 +45,13 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 You can run the pipeline directly on your local machine using Python, or in a container using Docker.
 Docker Compose is recommended for reproducible, containerized execution.
 
----
-
 #### Prerequisites
 - Python 3.10+ *(for host execution)*
 - Docker *(Docker Desktop recommended)*
 - Snowflake account
 - dbt
 
----
-
-## Option 1: Docker Compose
+#### Option 1: Docker Compose
 
 Runs the pipeline locally inside a Docker container.
 
@@ -76,8 +72,14 @@ SNOWFLAKE_SCHEMA=RAW
 # 3. Build and run pipeline
 docker compose up --build
 
+# 4. Transformations
+dbt deps
+dbt run
+dbt test
+
+# Note: dbt transformations are executed after ingestion and connect directly to Snowflake.
 ```
-## Option 2: Python
+#### Option 2: Python
 
 ```bash
 # 1. Clone repo
@@ -99,10 +101,11 @@ export SNOWFLAKE_SCHEMA=RAW
 python pipeline.py
 
 # 5. Transformations
-```bash
 dbt deps
 dbt run
 dbt test
+
+# Note: dbt transformations are executed after ingestion and connect directly to Snowflake.
 ```
 
 
