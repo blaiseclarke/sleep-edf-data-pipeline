@@ -40,7 +40,7 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 
 ---
 
-### Quick Start (Host Python or Docker)
+### Quick Start
 
 You can run the pipeline directly on your local machine using Python, or in a container using Docker.
 Docker Compose is recommended for reproducible, containerized execution.
