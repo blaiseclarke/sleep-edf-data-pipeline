@@ -1,6 +1,7 @@
 # Cloud-Native Sleep-EDF Analytics Pipeline
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Container-2496ED?logo=docker&logoColor=white)
 ![Snowflake](https://img.shields.io/badge/Snowflake-Data_Warehouse-29B5E8?logo=snowflake&logoColor=white)
 ![dbt](https://img.shields.io/badge/dbt-Transformation-FF694B?logo=dbt&logoColor=white)
 ![Prefect](https://img.shields.io/badge/Prefect-Orchestration-070E28?logo=prefect&logoColor=white)
@@ -24,6 +25,7 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 | **Orchestration** | **Prefect** | Flow management, retries, and observability |
 | **Warehousing** | **Snowflake** | Scalable cloud storage for raw and modeled data |
 | **Transformation** | **dbt** | SQL-based modeling for clinical insights |
+| **Runtime** | **Docker** | Reproducible environment for ingestion and orchestration |
 
 ---
 
@@ -38,35 +40,71 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 
 ---
 
-### Quick Start
+### Quick Start (Host Python or Docker)
 
-**Prerequisites:** Python 3.10+, Snowflake Account, dbt
+You can run the pipeline directly on your local machine using Python, or in a container using Docker.
+Docker Compose is recommended for reproducible, containerized execution.
+
+---
+
+#### Prerequisites
+- Python 3.10+ *(for host execution)*
+- Docker *(Docker Desktop recommended)*
+- Snowflake account
+- dbt
+
+---
+
+## Option 1: Docker Compose
+
+Runs the pipeline locally inside a Docker container.
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline.git
+cd sleep-edf-data-pipeline
+
+# 2. Create environment file
+# (.env file in project root)
+SNOWFLAKE_USER=your_user
+SNOWFLAKE_PASSWORD=your_password
+SNOWFLAKE_ACCOUNT=your_account_identifier
+SNOWFLAKE_WAREHOUSE=COMPUTE_WH
+SNOWFLAKE_DATABASE=EEG_ANALYTICS
+SNOWFLAKE_SCHEMA=RAW
+
+# 3. Build and run pipeline
+docker compose up --build
+
+```
+## Option 2: Python
 
 ```bash
 # 1. Clone repo
-git clone [https://github.com/blaiseclarke/sleep-edf-data-pipeline](https://github.com/blaiseclarke/sleep-edf-data-pipeline)
+git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline.git
 cd sleep-edf-data-pipeline
 
 # 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Configure environment
-# Create a .env file in root directory with your Snowflake credentials:
-# SNOWFLAKE_USER=your_user
-# SNOWFLAKE_PASSWORD=your_password
-# SNOWFLAKE_ACCOUNT=your_account_identifier
-# SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-# SNOWFLAKE_DATABASE=EEG_ANALYTICS
-# SNOWFLAKE_SCHEMA=RAW
+# 3. Configure environment variables
+export SNOWFLAKE_USER=your_user
+export SNOWFLAKE_PASSWORD=your_password
+export SNOWFLAKE_ACCOUNT=your_account_identifier
+export SNOWFLAKE_WAREHOUSE=COMPUTE_WH
+export SNOWFLAKE_DATABASE=EEG_ANALYTICS
+export SNOWFLAKE_SCHEMA=RAW
 
 # 4. Run ingestion pipeline
-python3 pipeline.py
+python pipeline.py
 
-# 5. Execute warehouse transformations
+# 5. Transformations
+```bash
 dbt deps
 dbt run
 dbt test
 ```
+
 
 ---
 
