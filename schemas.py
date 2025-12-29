@@ -1,11 +1,11 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+
 
 class SleepEpoch(BaseModel):
     """
     Defines the data contract for a single sleep epoch.
-    
-    This schema enforces data types, sleep stage labels, and that all power 
+
+    This schema enforces data types, sleep stage labels, and that all power
     bands must be positive.
     """
 
@@ -20,9 +20,11 @@ class SleepEpoch(BaseModel):
     sigma_power: float = Field(..., ge=0)
     beta_power: float = Field(..., ge=0)
 
-    @field_validator('delta_power', 'theta_power', 'alpha_power', 'sigma_power', 'beta_power')
+    @field_validator(
+        "delta_power", "theta_power", "alpha_power", "sigma_power", "beta_power"
+    )
     @classmethod
     def check_positive(cls, v: float) -> float:
         if v < 0:
-            raise ValueError('Power values must be non-negative')
+            raise ValueError("Power values must be non-negative")
         return v

@@ -2,6 +2,7 @@ import pytest
 from pydantic import ValidationError
 from schemas import SleepEpoch
 
+
 def test_valid_sleep_epoch():
     """
     Ensures data sample that meets constraints is successfully validated.
@@ -15,12 +16,13 @@ def test_valid_sleep_epoch():
         "theta_power": 14.2,
         "alpha_power": 8.0,
         "sigma_power": 1.2,
-        "beta_power": 2.5
+        "beta_power": 2.5,
     }
 
     epoch = SleepEpoch(**data)
     assert epoch.subject_id == 1
     assert epoch.stage == "N2"
+
 
 def test_negative_power_validation():
     """
@@ -35,13 +37,14 @@ def test_negative_power_validation():
         "theta_power": 14.2,
         "alpha_power": 8.0,
         "sigma_power": 1.2,
-        "beta_power": 2.5
+        "beta_power": 2.5,
     }
 
     with pytest.raises(ValidationError) as excinfo:
         SleepEpoch(**data)
 
     assert "Input should be greater than or equal to 0" in str(excinfo.value)
+
 
 def test_invalid_stage_label():
     """
@@ -56,7 +59,7 @@ def test_invalid_stage_label():
         "theta_power": 14.2,
         "alpha_power": 8.0,
         "sigma_power": 1.2,
-        "beta_power": 2.5
+        "beta_power": 2.5,
     }
 
     with pytest.raises(ValidationError):
