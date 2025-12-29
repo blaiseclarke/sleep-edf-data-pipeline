@@ -32,7 +32,9 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 ### Engineering Highlights
 
 * **🛡 Data Contracts (Pydantic):** Defined strict schemas to validate every epoch before ingestion. If a signal doesn't match the schema, the pipeline fails gracefully before corrupting the warehouse.
-* **⚡ Automated CI:** GitHub Actions triggers the `pytest` suite on every push, ensuring no regressions in signal processing logic.
+* **✨ Fast Linting (Ruff):** Integrated `ruff` for near-instant linting and code formatting, maintaining high code quality.
+* **⚡ Automated CI:** GitHub Actions triggers the `pytest` suite and `ruff` checks on every push, ensuring no regressions.
+* **🛠 Makefile Automation:** Simplified local development with a comprehensive `Makefile` for one-command installs, tests, and runs.
 * **🧪 Data Integrity Tests:** Custom dbt tests ensure logical consistency (e.g., *Band power must be positive*, *Sleep stages must be standard clinical codes*)
 * **🔄 Observability:** Prefect dashboard provides real-time logging and monitoring for all pipeline tasks.
 
@@ -49,6 +51,7 @@ Docker Compose is recommended for reproducible, containerized execution.
 - Python 3.10+ *(for host execution)*
 - Docker *(Docker Desktop recommended)*
 - Snowflake account
+- `make` *(for automation)*
 - dbt-core (pip install dbt-snowflake)
 
 #### Option 1: Docker Compose
@@ -80,28 +83,40 @@ dbt test --profiles-dir .
 
 # Note: dbt transformations are executed after ingestion and connect directly to Snowflake.
 ```
-#### Option 2: Python
+#### Option 2: Local Development (Makefile)
+
+The recommended way for local development and testing.
 
 ```bash
 # 1. Clone repo
 git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline.git
 cd sleep-edf-data-pipeline
 
-# 2. Install dependencies
-pip install -r requirements.txt
+# 2. Setup and Install
+make install
 
-# 3. Configure environment variables
+# 3. Configure environment variables (or use .env file)
 export SNOWFLAKE_USER=your_user
 export SNOWFLAKE_PASSWORD=your_password
-export SNOWFLAKE_ACCOUNT=your_account_identifier
-export SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-export SNOWFLAKE_DATABASE=EEG_ANALYTICS
-export SNOWFLAKE_SCHEMA=RAW
+# ... other vars as listed in Option 1
 
-# 4. Run ingestion pipeline
+# 4. Run, Lint, and Test
+make lint    # Check for errors
+make format  # Auto-format code
+make test    # Run unit tests
+make run     # Run ingestion pipeline
+```
+
+#### Option 3: Manual Python Execution
+
+```bash
+# Install dependencies manually
+pip install -r requirements.txt
+
+# Run ingestion pipeline directly
 python pipeline.py
 
-# 5. Transformations
+# Transformations
 # Point dbt to the local profiles.yml
 dbt deps --profiles-dir .
 dbt run --profiles-dir .
@@ -147,7 +162,7 @@ Reliability is enforced through a suite of automated tests:
 The pipeline successfully processed a batch of ~24-hour recordings from the PhysioNet Sleep-EDF database.
 
 **Generated Insights:**
-* Total sleep time and architecture breakdown
+* Sleep architecture breakdown
 * Frequency of nocturnal awakenings
 * Average spectral power distribution across EEG bands
 
