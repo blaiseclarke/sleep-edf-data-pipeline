@@ -102,9 +102,14 @@ export SNOWFLAKE_PASSWORD=your_password
 
 # 4. Run, Lint, and Test
 make lint    # Check for errors
-make format  # Auto-format code
+make format  # Autoformat code
 make test    # Run unit tests
 make run     # Run ingestion pipeline
+
+# 5. Transformations
+dbt deps --profiles-dir .
+dbt run --profiles-dir .
+dbt test --profiles-dir .
 ```
 
 #### Option 3: Manual Python Execution
@@ -154,7 +159,7 @@ The dbt project creates a trusted data lineage, transforming raw logs into analy
 Reliability is enforced through a suite of automated tests:
 * **Uniqueness:** `epoch_id` checked to prevent duplication.
 * **Constraints:** Sleep stages validated against accepted values defined in Pydantic.
-* **Logic:** Band powers must be positive floats; `null` checks on critical timestamps.
+* **Logic:** Band powers must be positive floats; `not null` checks on IDs and spectral metrics.
 
 ---
 
