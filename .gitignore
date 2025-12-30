@@ -1,9 +1,22 @@
 __pycache__/
 *.pyc
 .pytest_cache/
+.ruff_cache/
+.DS_Store
 
+# Virtual Environment
 venv/
-.env
+.venv/
 
-*.csv
+# Environment and Data
+.env
+data/
 *.edf
+*.csv
+*.db
+*.log
+
+# dbt Artifacts
+target/
+dbt_packages/
+logs/
