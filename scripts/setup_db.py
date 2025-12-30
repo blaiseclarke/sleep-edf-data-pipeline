@@ -1,6 +1,6 @@
 import duckdb
 
-DB_PATH = "sleep_data.db"
+from ingest_data import DB_PATH
 
 
 def setup_database():

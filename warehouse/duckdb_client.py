@@ -9,8 +9,13 @@ class DuckDBClient(WarehouseClient):
     DuckDB implementation of the WarehouseClient for local persistent storage.
     """
 
-    def __init__(self, db_path: str = "sleep_data.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        if db_path is None:
+            from ingest_data import DB_PATH
+
+            self.db_path = DB_PATH
+        else:
+            self.db_path = db_path
 
     def load_epochs(self, df: pd.DataFrame, subject_id: int) -> None:
         """

@@ -1,3 +1,5 @@
+all: lint format test
+
 install:
 	pip install -r requirements.txt
 
@@ -8,7 +10,10 @@ lint:
 	ruff check .
 
 test:
-	PYTHONPATH=. pytest
+	PYTHONPATH=. python -m pytest
 
 run:
 	python pipeline.py
+
+setup-db:
+	PYTHONPATH=. python scripts/setup_db.py

@@ -22,7 +22,7 @@ def integration_db(tmp_path, monkeypatch):
 
     # Ensure the pipeline's DuckDBClient instance uses this test database
     monkeypatch.setattr(
-        "pipeline.DuckDBClient", lambda: DuckDBClient(db_path=db_file)
+        "pipeline.DuckDBClient", lambda **kwargs: DuckDBClient(db_path=db_file)
     )
 
     return db_file
@@ -53,7 +53,6 @@ def test_pipeline_parallel_ingestion_integration(integration_db):
 
         # Control the flow to only process a single subject (ID 1)
         with patch("pipeline.STARTING_SUBJECT", 1), patch("pipeline.ENDING_SUBJECT", 1):
-
             # 3. Execute the full Prefect flow
             run_ingestion_pipeline()
 
@@ -66,6 +65,6 @@ def test_pipeline_parallel_ingestion_integration(integration_db):
     assert len(result_df) == 2, "Should have loaded exactly 2 rows"
     assert result_df["SUBJECT_ID"].unique()[0] == 1, "Subject ID should match mock"
     assert result_df["STAGE"].tolist() == ["W", "N1"], "Stages should match mock"
-    assert (
-        result_df["DELTA_POWER"].iloc[1] == 20.1
-    ), "Power values should be persisted correctly"
+    assert result_df["DELTA_POWER"].iloc[1] == 20.1, (
+        "Power values should be persisted correctly"
+    )

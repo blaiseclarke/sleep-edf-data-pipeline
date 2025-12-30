@@ -54,9 +54,9 @@ Docker Compose is recommended for reproducible, containerized execution.
 #### Prerequisites
 - Python 3.10+ *(for host execution)*
 - Docker *(Docker Desktop recommended)*
-- Snowflake account
+- Snowflake account *(optional, DuckDB used by default for local)*
 - `make` *(for automation)*
-- dbt-core (pip install dbt-snowflake)
+- dbt-core (pip install dbt-snowflake or dbt-duckdb)
 
 #### Option 1: Docker Compose
 
@@ -69,12 +69,21 @@ cd sleep-edf-data-pipeline
 
 # 2. Create environment file
 # (.env file in project root)
+# Snowflake Configuration (Optional)
 SNOWFLAKE_USER=your_user
 SNOWFLAKE_PASSWORD=your_password
 SNOWFLAKE_ACCOUNT=your_account_identifier
 SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 SNOWFLAKE_DATABASE=EEG_ANALYTICS
 SNOWFLAKE_SCHEMA=RAW
+
+# Pipeline Configuration (Optional overrides)
+STARTING_SUBJECT=0
+ENDING_SUBJECT=10
+RECORDING=1
+EPOCH_LENGTH=30.0
+PREFECT_MAX_WORKERS=3
+DB_PATH=sleep_data.db
 
 # 3. Build and run pipeline
 docker compose up --build
@@ -99,16 +108,20 @@ cd sleep-edf-data-pipeline
 # 2. Setup and install
 make install
 
-# 3. Initialize local database
-python scripts/setup_db.py
+# 3. Quick Test (Lint, Format, Test)
+make all
 
-# 4. Run, lint, and Test
+# 4. Initialize local database
+make setup-db
+
+# 5. Run, lint, and Test
 make lint    # Check for errors
 make format  # Autoformat code
 make run     # Run parallel ingestion pipeline (persists to DuckDB)
 
-# 5. Transformations
-# (Requires dbt-duckdb or Snowflake setup)
+# 6. Transformations (Local DuckDB)
+dbt run --profiles-dir . --target dev_duckdb
+dbt test --profiles-dir . --target dev_duckdb
 ```
 
 #### Option 3: Manual Python Execution
@@ -117,16 +130,18 @@ make run     # Run parallel ingestion pipeline (persists to DuckDB)
 # Install dependencies manually
 pip install -r requirements.txt
 
-# Run ingestion pipeline directly
+# 2. Initialize local database
+python scripts/setup_db.py
+
+# 3. Run ingestion pipeline directly
 python pipeline.py
 
-# Transformations
-# Point dbt to the local profiles.yml
+# Transformations (Default to Snowflake if .env configured)
 dbt deps --profiles-dir .
 dbt run --profiles-dir .
 dbt test --profiles-dir .
 
-# Note: dbt transformations are executed after ingestion and connect directly to Snowflake.
+# Note: Use `--target dev_duckdb` to run against local storage.
 ```
 
 
@@ -139,10 +154,18 @@ Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. T
 
 * **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands.
 * **Standardization:** Maps raw annotations to standardized clinical sleep stages: `W, N1, N2, N3, REM, MOVE, NAN`.
-* **Performance Optimization:** Utilizes `preload=True` to speed up FFT computations, with configurable batching for larger subject sets.
+* **Performance Optimization:** Utilizes `preload=True` to speed up FFT computations.
+* **Configurable Parameters:** The pipeline range and logic are controlled via environment variables:
+    * `STARTING_SUBJECT` / `ENDING_SUBJECT`: Define the participant ID range.
+    * `RECORDING`: Specifies which session recording to fetch (default: 1).
+    * `EPOCH_LENGTH`: Sets the window duration for EEG segmentation (default: 30s).
+    * `DB_PATH`: Local path for the DuckDB database (default: `sleep_data.db`).
+    * `PREFECT_MAX_WORKERS`: Limit on concurrent subject processing (default: 3).
 
-#### 2. Warehousing (Snowflake)
-Data is loaded into Snowflake to separate compute from storage. This allows the pipeline to scale without refactoring local memory constraints or ingestion logic.
+#### 2. Warehousing (DuckDB / Snowflake)
+The pipeline is warehouse-agnostic via the `WarehouseClient` protocol.
+* **DuckDB (Local):** Default for local development. Data is persisted to `sleep_data.db` without cloud overhead.
+* **Snowflake (Cloud):** Used for production-scale storage and analytics, separating compute from storage. This allows the pipeline to scale without refactoring local memory constraints or ingestion logic.
 
 #### 3. Transformation (dbt)
 The dbt project creates a trusted data lineage, transforming raw logs into analytics-ready models:
@@ -154,11 +177,11 @@ The dbt project creates a trusted data lineage, transforming raw logs into analy
     * Awakening counts
     * Average power across frequency bands
 
-#### 4. Data Integrity (Testing)
-Reliability is enforced through a suite of automated tests:
-* **Uniqueness:** Unique IDs checked to prevent duplication.
-* **Constraints:** Sleep stages validated against accepted values defined in Pandera.
-* **Logic:** Band powers must be positive floats; `not null` checks on spectral metrics.
+#### 4. Data Integrity & Observability
+Reliability is enforced through automated checks and failure logging:
+* **Validation (Pandera):** Sleep stages and spectral powers are validated against strict contracts.
+* **Error Warehouse:** Extraction and validation failures are logged to the `INGESTION_ERRORS` table with full stack traces.
+* **dbt Tests:** Custom SQL tests ensure logical consistency (e.g., *Rolling averages cannot be negative*).
 
 ---
 
