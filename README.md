@@ -40,7 +40,7 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 * **✨ Fast Linting (Ruff):** Integrated `ruff` for near-instant linting and code formatting.
 * **⚡ Automated CI:** GitHub Actions triggers the `pytest` suite and `ruff` checks on every push.
 * **🛠 Makefile Automation:** Simplified local development with a comprehensive `Makefile` for one-command installs and runs.
-* **🧪 Data Integrity Tests:** Custom dbt tests ensure logical consistency (e.g., *Band power must be positive*).
+* **🧪 Data Integrity Tests:** Custom dbt tests ensure logical consistency (ex. *band power must be positive*).
 
 <img width="986" height="497" alt="Prefect dashboard" src="https://github.com/user-attachments/assets/ed9f1351-14b1-4301-a5c0-e6c18ce97ccb" />
 
