@@ -4,7 +4,7 @@ import pandas as pd
 from prefect import task, flow, get_run_logger
 
 from ingest_data import (
-    process_subject as extract_logic,
+    process_subject,
     fetch_data,
     STARTING_SUBJECT,
     ENDING_SUBJECT,
@@ -20,14 +20,12 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 @task(retries=2, retry_delay_seconds=10)
 def extract_subject_data(subject_id: int) -> dict:
-    """
-    Locates and extracts subject data from the local EDF files.
-    """
+    """Locates and extracts subject data from local EDF files."""
     logger = get_run_logger()
     logger.info(f"Starting extraction for subject {subject_id}")
 
     try:
-        df = extract_logic(subject_id)
+        df = process_subject(subject_id)
 
         if df is None or df.empty:
             return {
@@ -53,9 +51,7 @@ def extract_subject_data(subject_id: int) -> dict:
 
 @task
 def validate_data(df: pd.DataFrame, subject_id: int) -> dict:
-    """
-    Validates raw DataFrame records against the Pandera SleepSchema.
-    """
+    """Validates raw DataFrame records against the Pandera SleepSchema."""
     logger = get_run_logger()
 
     try:
@@ -75,10 +71,8 @@ def validate_data(df: pd.DataFrame, subject_id: int) -> dict:
 
 
 @task
-def process_subject(subject_id: int) -> dict:
-    """
-    Composite task to handle extraction and validation for a single subject.
-    """
+def process_subject_task(subject_id: int) -> dict:
+    """Composite task to handle extraction and validation for a single subject."""
     result = extract_subject_data(subject_id)
 
     if result["error"]:
@@ -89,9 +83,7 @@ def process_subject(subject_id: int) -> dict:
 
 @task
 def load_to_warehouse(client: DuckDBClient, df: pd.DataFrame, subject_id: int):
-    """
-    Persists subject data to the configured warehouse.
-    """
+    """Persists subject data to the configured warehouse."""
     logger = get_run_logger()
     logger.info(f"Loading data for subject {subject_id} to warehouse...")
     client.load_epochs(df, subject_id)
@@ -104,9 +96,7 @@ def load_to_warehouse(client: DuckDBClient, df: pd.DataFrame, subject_id: int):
     ),
 )
 def run_ingestion_pipeline():
-    """
-    Executes the ingestion pipeline using Prefect mapping for parallelization.
-    """
+    """Executes the ingestion pipeline using Prefect mapping for parallelization."""
     logger = get_run_logger()
     warehouse_client = DuckDBClient(db_path=DB_PATH)
 
@@ -120,7 +110,7 @@ def run_ingestion_pipeline():
 
     # Use mapping for parallel extraction and validation
     # Parallel tasks no longer write to the warehouse to avoid locking
-    processed_results = process_subject.map(subject_ids)
+    processed_results = process_subject_task.map(subject_ids)
 
     # Serialized loading and error logging to avoid DuckDB locking
     for subject_id, result_future in zip(subject_ids, processed_results):

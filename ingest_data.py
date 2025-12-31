@@ -20,9 +20,7 @@ STUDY = os.getenv("STUDY", "age").lower()  # Options: age, telemetry
 
 
 def fetch_data(subjects, recording):
-    """
-    Wrapper to fetch data from the designated study.
-    """
+    """Fetch data from Age or Telemetry study."""
     if STUDY == "telemetry":
         return fetch_telemetry_data(
             subjects=subjects, recording=recording, on_missing="warn"
