@@ -35,7 +35,8 @@ This project is an end-to-end ELT pipeline that transforms raw physiological sig
 ### Engineering Highlights
 
 * **🛡 Data Contracts (Pandera):** Transitioned to `pandera` for high-performance schema validation of large DataFrames.
-* **🚀 Parallel Execution:** Leveraged Prefect Mapping to process subject signal extractions concurrently.
+* **🚀 Parallel Execution:** Leveraged Prefect Mapping to process subject features concurrently with thread-safe, centralized error coordination.
+* **📦 Upfront Data Fetching:** Optimized MNE data ingestion by fetching all required subjects upfront, eliminating filesystem contention during parallel processing.
 * **💾 Local Warehousing (DuckDB):** Implemented DuckDB for fast, local persistent storage, enabling development without a Snowflake trial.
 * **✨ Fast Linting (Ruff):** Integrated `ruff` for near-instant linting and code formatting.
 * **⚡ Automated CI:** GitHub Actions triggers the `pytest` suite and `ruff` checks on every push.
@@ -119,7 +120,10 @@ make lint    # Check for errors
 make format  # Autoformat code
 make run     # Run parallel ingestion pipeline (persists to DuckDB)
 
-# 6. Transformations (local DuckDB)
+# 6. Test Observability
+python simulate_error.py  # Verifies the Error Warehouse captures failures
+
+# 7. Transformations (local DuckDB)
 dbt run --profiles-dir . --target dev_duckdb
 dbt test --profiles-dir . --target dev_duckdb
 ```
@@ -180,7 +184,7 @@ The dbt project creates a trusted data lineage, transforming raw logs into analy
 #### 4. Data Integrity & Observability
 Reliability is enforced through automated checks and failure logging:
 * **Validation (Pandera):** Sleep stages and spectral powers are validated against strict contracts.
-* **Error Warehouse:** Extraction and validation failures are logged to the `INGESTION_ERRORS` table with full stack traces.
+* **Error Warehouse:** Failures are intercepted and logged sequentially to the `INGESTION_ERRORS` table, ensuring 100% thread safety and detailed stack trace persistence even during parallel runs.
 * **dbt Tests:** Custom SQL tests ensure logical consistency (e.g., *Rolling averages cannot be negative*).
 
 ---

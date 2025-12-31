@@ -49,7 +49,11 @@ def test_pipeline_parallel_ingestion_integration(integration_db):
 
     # 2. Patch core extraction and flow control variables
     with patch("pipeline.extract_subject_data") as mock_extract:
-        mock_extract.return_value = mock_df
+        mock_extract.return_value = {
+            "subject_id": 1,
+            "data": mock_df,
+            "error": None,
+        }
 
         # Control the flow to only process a single subject (ID 1)
         with patch("pipeline.STARTING_SUBJECT", 1), patch("pipeline.ENDING_SUBJECT", 1):

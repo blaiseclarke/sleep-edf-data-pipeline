@@ -3,7 +3,11 @@ import logging
 import numpy as np
 import pandas as pd
 import mne
+from dotenv import load_dotenv
 from mne.datasets.sleep_physionet.age import fetch_data
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
 STARTING_SUBJECT = int(os.getenv("STARTING_SUBJECT", 0))

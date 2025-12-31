@@ -1,3 +1,4 @@
+import os
 import logging
 import duckdb
 
@@ -12,6 +13,12 @@ def setup_database():
     """
     Initializes the DuckDB database and creates the necessary tables.
     """
+    # Create directory if it doesn't exist
+    db_dir = os.path.dirname(DB_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        logger.info(f"Creating database directory: {db_dir}")
+        os.makedirs(db_dir, exist_ok=True)
+
     connection = duckdb.connect(DB_PATH)
 
     try:
