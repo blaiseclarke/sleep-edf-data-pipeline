@@ -15,7 +15,7 @@ STARTING_SUBJECT = int(os.getenv("STARTING_SUBJECT", 0))
 ENDING_SUBJECT = int(os.getenv("ENDING_SUBJECT", 10))
 RECORDING = int(os.getenv("RECORDING", 1))
 EPOCH_LENGTH = float(os.getenv("EPOCH_LENGTH", 30.0))  # seconds
-DB_PATH = os.getenv("DB_PATH", "sleep_data.db")
+DB_PATH = os.getenv("DB_PATH", "data/sleep_data.db")
 STUDY = os.getenv("STUDY", "age").lower()  # Options: age, telemetry
 
 

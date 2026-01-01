@@ -1,3 +1,4 @@
+import os
 import duckdb
 import pandas as pd
 from typing import Optional
@@ -16,6 +17,10 @@ class DuckDBClient(WarehouseClient):
             self.db_path = DB_PATH
         else:
             self.db_path = db_path
+        
+        # Ensure parent directory exists
+        if self.db_path and os.path.dirname(self.db_path):
+            os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
     def load_epochs(self, df: pd.DataFrame, subject_id: int) -> None:
         """
