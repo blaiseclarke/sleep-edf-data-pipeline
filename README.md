@@ -209,7 +209,7 @@ Reliability is enforced through automated checks and failure logging:
 ---
 
 ### Results
-The pipeline successfully processed the entire **PhysioNet Sleep-EDF (Age Study)**, ingesting and analyzing over **33,000 epochs** across all **78 subjects**.
+The pipeline successfully processed the entire PhysioNet Sleep-EDF (Age Study), ingesting and analyzing over 33,000 epochs across all 78 subjects.
 
 **Generated Insights:**
 * Sleep architecture breakdown
