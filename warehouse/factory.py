@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from warehouse.base import WarehouseClient
 from warehouse.duckdb_client import DuckDBClient
 from warehouse.snowflake_client import SnowflakeClient

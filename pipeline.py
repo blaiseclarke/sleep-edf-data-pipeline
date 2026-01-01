@@ -9,7 +9,6 @@ from ingest_data import (
     STARTING_SUBJECT,
     ENDING_SUBJECT,
     RECORDING,
-    DB_PATH,
     STUDY,
 )
 from warehouse.factory import get_warehouse_client

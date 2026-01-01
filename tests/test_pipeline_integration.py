@@ -14,16 +14,12 @@ def integration_db(tmp_path, monkeypatch):
     """
     db_file = str(tmp_path / "integration_sleep.db")
 
-    # Patch the setup script and DuckDBClient init to use this temporary path
+    # Patch the source of truth for DB_PATH
+    monkeypatch.setattr("ingest_data.DB_PATH", db_file)
     monkeypatch.setattr("scripts.setup_db.DB_PATH", db_file)
 
     # Initialize the schema in the fresh database
     setup_database()
-
-    # Ensure the pipeline's DuckDBClient instance uses this test database
-    monkeypatch.setattr(
-        "pipeline.DuckDBClient", lambda **kwargs: DuckDBClient(db_path=db_file)
-    )
 
     return db_file
 

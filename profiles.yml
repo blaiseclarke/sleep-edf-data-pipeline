@@ -14,6 +14,6 @@ sleep_analytics:
 
     dev_duckdb:
       type: duckdb
-      path: "{{ env_var('DB_PATH', 'sleep_data.db') }}"
+      path: "{{ env_var('DB_PATH', 'data/sleep_data.db') }}"
       schema: main
       threads: 1

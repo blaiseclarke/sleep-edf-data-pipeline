@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: eeg_raw
-    database: "{{ env_var('DBT_SOURCE_DATABASE', 'main') }}"
+    database: "{{ env_var('DBT_SOURCE_DATABASE', 'sleep_data') }}"
     schema: "{{ env_var('DBT_SOURCE_SCHEMA', 'main') }}"
     tables:
       - name: SLEEP_EPOCHS
