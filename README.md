@@ -62,20 +62,24 @@ Docker Compose is recommended for reproducible, containerized execution.
 Create a `.env` file in the project root to store your configuration. This ensures consistency between Docker and local execution.
 
 ```env
-# Warehouse selection (duckdb or snowflake)
-WAREHOUSE_TYPE=snowflake
+# --- Default Configuration (DuckDB) ---
+WAREHOUSE_TYPE=duckdb
+DB_PATH=data/sleep_data.db
 
-# Snowflake credentials
-SNOWFLAKE_ACCOUNT=your_account
-SNOWFLAKE_USER=your_user
-SNOWFLAKE_PASSWORD=your_password
-SNOWFLAKE_WAREHOUSE=COMPUTE_WH
-SNOWFLAKE_DATABASE=EEG_ANALYTICS
-SNOWFLAKE_SCHEMA=RAW
+# --- Optional: Snowflake Configuration ---
+# WAREHOUSE_TYPE=snowflake
+# SNOWFLAKE_ACCOUNT=your_account
+# SNOWFLAKE_USER=your_user
+# SNOWFLAKE_PASSWORD=your_password
+# SNOWFLAKE_WAREHOUSE=COMPUTE_WH
+# SNOWFLAKE_DATABASE=EEG_ANALYTICS
+# SNOWFLAKE_SCHEMA=RAW
 
-# dbt compatibility (map to Snowflake env vars)
-DBT_SOURCE_DATABASE=EEG_ANALYTICS
-DBT_SOURCE_SCHEMA=RAW
+# --- dbt Configuration ---
+# If using DuckDB (default), these rely on DB_PATH.
+# If using Snowflake, uncomment and map to above vars:
+# DBT_SOURCE_DATABASE=EEG_ANALYTICS
+# DBT_SOURCE_SCHEMA=RAW
 ```
 
 **2. Environment Loading**
