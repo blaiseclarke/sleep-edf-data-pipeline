@@ -127,7 +127,7 @@ dbt deps --profiles-dir .
 dbt run --profiles-dir .
 dbt test --profiles-dir .
 
-# Note: dbt transformations are executed after ingestion and connect directly to Snowflake.
+# Note: dbt transformations are executed after ingestion and connect to the configured warehouse (DuckDB or Snowflake).
 ```
 #### Option 2: Local Development (Makefile)
 
