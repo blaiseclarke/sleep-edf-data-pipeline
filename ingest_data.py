@@ -20,7 +20,16 @@ STUDY = os.getenv("STUDY", "age").lower()  # Options: age, telemetry
 
 
 def fetch_data(subjects, recording):
-    """Fetch data from Age or Telemetry study."""
+    """
+    Fetches raw Sleep-EDF data files from PhysioNet.
+
+    Args:
+        subjects (list[int]): List of subject IDs to fetch.
+        recording (list[int]): List of recording indices (1 or 2).
+
+    Returns:
+        list[list[str]]: A list of [psg_path, hypnogram_path] pairs for each subject.
+    """
     if STUDY == "telemetry":
         return fetch_telemetry_data(
             subjects=subjects, recording=recording, on_missing="warn"
@@ -45,6 +54,23 @@ logger = logging.getLogger(__name__)
 
 
 def process_subject(subject_id):
+    """
+    Orchestrates the extraction, signal processing, and feature engineering for a single subject.
+
+    Logic:
+    1. Fetches raw data (with automatic fallback to Recording 2 if Recording 1 is missing).
+    2. Loads EDF files using MNE.
+    3. Standardizes channel names.
+    4. Segments data into 30s epochs.
+    5. Computes Power Spectral Density (PSD) for 5 frequency bands.
+    6. Returns a structured DataFrame.
+
+    Args:
+        subject_id (int): The unique identifier of the subject.
+
+    Returns:
+        pd.DataFrame or None: A DataFrame containing epoch-level features, or None if no data found.
+    """
     filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
     if not filepaths:
         logger.warning(
@@ -129,6 +155,18 @@ def process_subject(subject_id):
 
 
 def calculate_band_power(psd, frequencies, fmin, fmax):
+    """
+    Calculates the mean power within a specific frequency band.
+
+    Args:
+        psd (np.ndarray): Power Spectral Density array (epochs, channels, freqs).
+        frequencies (np.ndarray): Array of frequencies corresponding to PSD.
+        fmin (float): Lower bound of the frequency band.
+        fmax (float): Upper bound of the frequency band.
+
+    Returns:
+        np.ndarray: Mean power for the band across all epochs/channels.
+    """
     idx = np.logical_and(frequencies >= fmin, frequencies <= fmax)
 
     power = psd[:, :, idx].mean(axis=(1, 2)) * 1e12
