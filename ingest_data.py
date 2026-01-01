@@ -47,6 +47,12 @@ logger = logging.getLogger(__name__)
 def process_subject(subject_id):
     filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
     if not filepaths:
+        logger.warning(
+            f"Subject {subject_id} missing recording {RECORDING}. Attempting fallback to recording {RECORDING + 1}."
+        )
+        filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING + 1])
+
+    if not filepaths:
         return None
 
     psg_file = filepaths[0][0]
