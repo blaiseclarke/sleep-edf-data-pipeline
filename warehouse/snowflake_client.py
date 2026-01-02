@@ -13,8 +13,8 @@ class SnowflakeClient(WarehouseClient):
     """
 
     def __init__(self):
-        # We rely on environment variables or external configuration for connection details.
-        # This keeps the init simple and secure.
+        # Relies on environment variables or external configuration for connection details.
+        # Keeps the initialization simple and secure.
         self.user = os.getenv("SNOWFLAKE_USER")
         self.password = os.getenv("SNOWFLAKE_PASSWORD")
         self.account = os.getenv("SNOWFLAKE_ACCOUNT")
@@ -41,7 +41,7 @@ class SnowflakeClient(WarehouseClient):
         conn = self._get_connection()
         try:
             # 1. Clear existing data for this subject (Idempotency).
-            # This ensures if we re-run a pipeline for a subject, we don't end up with duplicate rows.
+            # Prevents duplicate rows if the pipeline is re-run for a subject.
             # (Snowflake connector uses %s for safe parameter binding).
             cursor = conn.cursor()
             cursor.execute(

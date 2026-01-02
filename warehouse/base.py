@@ -5,8 +5,8 @@ import pandas as pd
 class WarehouseClient(Protocol):
     """
     A blueprint that all database clients must follow.
-    This ensures our pipeline can talk to DuckDB, Snowflake, or any future database
-    using the exact same methods.
+    Ensures the pipeline can interact with DuckDB, Snowflake, or other databases
+    using a consistent interface.
     """
 
     def load_epochs(self, df: pd.DataFrame, subject_id: int) -> None:

@@ -47,8 +47,8 @@ class DuckDBClient(WarehouseClient):
             ]
 
             # Insert new records using explicit column list.
-            # DuckDB's unique ability to query local pandas DataFrames directly ('FROM df')
-            # makes this extremely fast and avoids manual row iteration.
+            # Leverages DuckDB's ability to query local pandas DataFrames directly ('FROM df')
+            # for high-performance interactions causing minimal overhead.
             query = f"""
                 INSERT INTO SLEEP_EPOCHS ({", ".join(columns)})
                 SELECT {", ".join(columns)}

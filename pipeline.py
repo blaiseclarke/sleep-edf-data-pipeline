@@ -102,23 +102,22 @@ def run_ingestion_pipeline():
 
     subject_ids = list(range(STARTING_SUBJECT, ENDING_SUBJECT + 1))
 
-    # Fetching data upfront is critical to avoid race conditions.
-    # If multiple workers try to download the same missing file simultaneously,
-    # they might corrupt the file or crash the download.
+    # 1. Download data first.
+    # This prevents errors caused by multiple workers attempting 
+    # to download the same file simultaneously.
     logger.info(
         f"Ensuring data is available for subjects {subject_ids} in study '{STUDY}'"
     )
     fetch_data(subjects=subject_ids, recording=[RECORDING])
 
-    # We use Prefect's .map() to parallelize the CPU-heavy signal processing.
-    # This allows us to process multiple subjects concurrently on available cores.
-    # Note: These tasks do NOT write to the DB directly; they return data to avoid
-    # SQLite/DuckDB locking issues during parallel writes.
+    # 2. Process data in parallel.
+    # Uses .map() to execute the processing task for all subjects 
+    # concurrently, leveraging available CPU cores.
     processed_results = process_subject_task.map(subject_ids)
 
-    # Serialized loading ensures thread safety for DuckDB.
-    # While DuckDB handles concurrency better than SQLite, single-threaded writes
-    # are the safest path for guaranteed data integrity locally.
+    # 3. Save results sequentially.
+    # Iterates through results and persists them to the database.
+    # Serial execution ensures data integrity and prevents file corruption.
     for subject_id, result_future in zip(subject_ids, processed_results):
         try:
             result = result_future.result()

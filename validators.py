@@ -1,9 +1,9 @@
 import pandera.pandas as pa
 
 # Define the Data Quality Schema.
-# We use Pandera to check our data *before* it hits the database.
-# This raises an error early if we accidentally produce negative power values
-# or invalid sleep stage labels.
+# Uses Pandera to validate data before persistence.
+# Raises an error immediately if invalid values (e.g., negative power)
+# or non-standard sleep stages are detected.
 SleepSchema = pa.DataFrameSchema(
     {
         "subject_id": pa.Column(int),

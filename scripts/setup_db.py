@@ -23,7 +23,7 @@ def setup_database():
 
     try:
         # Create SLEEP_EPOCHS table.
-        # This is our main fact table where we store the calculated power spectral density
+        # Main fact table storing calculated power spectral density
         # and sleep stages for every 30-second epoch.
         connection.execute(
             """
@@ -42,7 +42,7 @@ def setup_database():
         )
 
         # Create INGESTION_ERRORS table.
-        # We log any failures here so we can debug specific subject issues later
+        # Logs failures here to enable debugging specific subject issues
         # without halting the entire pipeline execution.
         connection.execute(
             """
