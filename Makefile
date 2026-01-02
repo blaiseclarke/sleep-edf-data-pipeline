@@ -10,7 +10,7 @@ lint:
 	ruff check .
 
 test:
-	PYTHONPATH=. python -m pytest
+	PREFECT_API_URL="" PYTHONPATH=. python -m pytest
 
 run:
 	python pipeline.py

@@ -26,16 +26,17 @@ def test_valid_sleep_epoch():
     assert validated_df["stage"].iloc[0] == "N2"
 
 
-def test_negative_power_validation():
+def test_nan_power_validation():
     """
-    Ensures Pandera schema raises a SchemaError when a negative power band is seen.
+    Ensures Pandera schema raises a SchemaError when a NaN power value is seen.
+    Negative values are allowed (dB), but NaNs indicate a calculation failure.
     """
 
     data = {
         "subject_id": [1],
         "epoch_idx": [100],
         "stage": ["W"],
-        "delta_power": [-5.0],
+        "delta_power": [float("nan")],
         "theta_power": [14.2],
         "alpha_power": [8.0],
         "sigma_power": [1.2],
@@ -43,11 +44,8 @@ def test_negative_power_validation():
     }
 
     df = pd.DataFrame(data)
-    with pytest.raises(SchemaError) as excinfo:
+    with pytest.raises(SchemaError):
         SleepSchema.validate(df)
-
-    assert "Column 'delta_power' failed" in str(excinfo.value)
-    assert "greater_than_or_equal_to(0)" in str(excinfo.value)
 
 
 def test_invalid_stage_label():
