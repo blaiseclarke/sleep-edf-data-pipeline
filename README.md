@@ -204,7 +204,7 @@ The dbt project creates a trusted data lineage, transforming raw logs into analy
 Reliability is enforced through automated checks and failure logging:
 * **Validation (Pandera):** Sleep stages and spectral powers are validated against strict contracts.
 * **Error Warehouse:** Failures are intercepted and logged sequentially to the `INGESTION_ERRORS` table, ensuring 100% thread safety and detailed stack trace persistence even during parallel runs.
-* **dbt Tests:** Custom SQL tests ensure logical consistency (ex., *Rolling averages cannot be negative*).
+* **dbt Tests:** Custom SQL tests ensure logical consistency (ex. *Rolling averages cannot be negative*).
 
 ---
 
@@ -215,6 +215,15 @@ The pipeline successfully processed the entire PhysioNet Sleep-EDF (Age Study), 
 * Sleep architecture breakdown
 * Frequency of nocturnal awakenings
 * Average spectral power distribution across EEG bands
+
+### Live Demo
+[Streamlit](https://sleepedf-demo.streamlit.app/)
+
+Explore sleep architecture and power ratios from the Sleep-EDF age study dataset. Queries dbt models directly from DuckDB.
+
+**Features:**
+*   **Subject Viewer**: Inspect individual recordings (Hypnogram, spectral power).
+*   **Clinical Metrics**: Total sleep time, awakenings, and sleep stage percentages.
 
 ---
 
