@@ -20,7 +20,12 @@ from prefect.task_runners import ConcurrentTaskRunner
 
 @task(retries=2, retry_delay_seconds=10)
 def extract_subject_data(subject_id: int) -> dict:
-    """Locates and extracts subject data from local EDF files."""
+    """
+    Locates and extracts subject data from local EDF files.
+    
+    This is kept separate from validation to debug extraction errors 
+    (ex. missing files, corrupt headers) independently of data quality errors.
+    """
     logger = get_run_logger()
     logger.info(f"Starting extraction for subject {subject_id}")
 
@@ -51,7 +56,13 @@ def extract_subject_data(subject_id: int) -> dict:
 
 @task
 def validate_data(df: pd.DataFrame, subject_id: int) -> dict:
-    """Validates raw DataFrame records against the Pandera SleepSchema."""
+    """
+    Validates raw DataFrame records against the Pandera SleepSchema.
+    
+    This acts as a gatekeeper: if the data contains negative power values or 
+    unknown sleep stages, it is rejected *before* it gets to the database.
+    This prevents "garbage in, garbage out" in the downstream dashboard.
+    """
     logger = get_run_logger()
 
     try:
@@ -96,15 +107,22 @@ def load_to_warehouse(client: WarehouseClient, df: pd.DataFrame, subject_id: int
     ),
 )
 def run_ingestion_pipeline():
-    """Executes the ingestion pipeline using Prefect mapping for parallelization."""
+    """
+    Executes the ingestion pipeline.
+    
+    1. EXTRACT/TRANSFORM: Run `process_subject_task` in parallel because 
+       signal processing is CPU intensive and the subjects are independent.
+    2. LOAD: Switch to a sequential loop to write to the database.
+       This is done because SQLite/DuckDB (the local DBs) can lock up or corrupt 
+       files if multiple processes try to write to them simultaneously.
+    """
     logger = get_run_logger()
     warehouse_client = get_warehouse_client()
 
     subject_ids = list(range(STARTING_SUBJECT, ENDING_SUBJECT + 1))
 
-    # 1. Downloads data first
-    # Prevents errors caused by multiple workers attempting 
-    # to download the same file simultaneously
+    # 1. Pre-fetch data
+    # logical step: download everything first
     logger.info(
         f"Ensuring data is available for subjects {subject_ids} in study '{STUDY}'"
     )
@@ -115,9 +133,10 @@ def run_ingestion_pipeline():
     # concurrently, leveraging available CPU cores
     processed_results = process_subject_task.map(subject_ids)
 
-    # 3. Saves results sequentially
-    # Iterates through results and persists them to the database
-    # Serial execution ensures data integrity and prevents file corruption
+    # 3. Serial write
+    # Deliberately write one subject at a time
+    # While slower, this guarantees the database file never gets corrupted
+    # by concurrent write attempts
     for subject_id, result_future in zip(subject_ids, processed_results):
         try:
             result = result_future.result()

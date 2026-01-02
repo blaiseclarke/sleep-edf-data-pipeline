@@ -20,5 +20,5 @@ class WarehouseClient(Protocol):
         error_message: str,
         stack_trace: Optional[str] = None,
     ) -> None:
-        """Saves error details to a table so we can debug them later."""
+        """Saves error details to a table to debug them later."""
         ...

@@ -24,8 +24,8 @@ def fetch_data(subjects, recording):
     Fetches raw Sleep-EDF data files from PhysioNet.
 
     Args:
-        subjects (list[int]): List of subject IDs to fetch.
-        recording (list[int]): List of recording indices (1 or 2).
+        subjects (list[int]): Which subjects to download (e.g., [1, 2]).
+        recording (list[int]): Which recording session to grab (1 is the baseline, 2 is often the fallout).
 
     Returns:
         list[list[str]]: A list of [psg_path, hypnogram_path] pairs for each subject.
@@ -73,6 +73,8 @@ def process_subject(subject_id):
     """
     filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
     if not filepaths:
+        # Sometimes Recording 1 is corrupt or missing. Fallback to Recording 2 
+        # to ensure *some* data is retrieved for this subject, rather than failing entirely.
         logger.warning(
             f"Subject {subject_id} missing recording {RECORDING}. Attempting fallback to recording {RECORDING + 1}."
         )
@@ -89,7 +91,9 @@ def process_subject(subject_id):
     annotations = mne.read_annotations(hypnogram_file)
     raw.set_annotations(annotations, emit_warning=False)
 
-    # Standardizes channel names to ensure consistency across studies
+    # Rename channels to standard names so downstream analysis doesn't care if 
+    # the original file used "EEG Fpz-Cz" or just "Fpz".
+    # Aim for a unified schema: EEG, EOG, EMG.
     mapping = {
         "EEG Fpz-Cz": "EEG",
         "EEG Pz-Oz": "EEG2",
@@ -99,7 +103,8 @@ def process_subject(subject_id):
     map = {k: v for k, v in mapping.items() if k in raw.ch_names}
     raw.rename_channels(map)
 
-    # Slices continuous signal into 30-second windows (standard for sleep scoring)
+    # Identify sleep stages from the hypnogram.
+    # Chunk the data into 30s epochs because that's the clinical standard for sleep scoring.
     events, event_id = mne.events_from_annotations(
         raw, event_id=None, chunk_duration=EPOCH_LENGTH
     )
@@ -117,8 +122,12 @@ def process_subject(subject_id):
         on_missing="ignore",
     )
 
-    # Calculates power across bands
-    spectrum = epochs.compute_psd(picks=["eeg"])
+    # Calculate Power Spectral Density (PSD) using Welch's Method.
+    # Use a 2.56s window which gives ~0.39 Hz frequency resolution.
+    # This is fine-grained enough to separate Delta (0.5-4Hz) from Theta (4-8Hz).
+    spectrum = epochs.compute_psd(
+        method="welch", picks=["eeg"], fmin=0.5, fmax=30.0, n_fft=256, n_per_seg=256
+    )
     psd, frequencies = spectrum.get_data(return_freqs=True)
 
     # Creates dataframe
@@ -134,7 +143,9 @@ def process_subject(subject_id):
     # Cleans sleep stage names
     df["stage"] = df["sleep_stage_label"].apply(lambda x: SLEEP_STAGE_MAP.get(x, x))
 
-    # Adds power to dataframe
+    # Extract power for specific frequency bands.
+    # Calculate Total Power (Area Under the Curve) and convert it to dB.
+    # This keeps values in a manageable range (e.g., 30-60 dB) rather than massive uV^2 numbers.
     df["delta_power"] = calculate_band_power(psd, frequencies, 0.5, 4)
     df["theta_power"] = calculate_band_power(psd, frequencies, 4, 8)
     df["alpha_power"] = calculate_band_power(psd, frequencies, 8, 12)
@@ -156,7 +167,12 @@ def process_subject(subject_id):
 
 def calculate_band_power(psd, frequencies, fmin, fmax):
     """
-    Calculates the mean power within a specific frequency band.
+    Calculates the mean power within a specific frequency band in dB.
+
+    Methodology:
+    1. Select frequency bins that fall within the requested band (e.g., 8-12 Hz for Alpha).
+    2. Integrate the density (sum * resolution) to get Total Power (uV^2).
+    3. Convert to Decibels (dB) using 10 * log10(Power).
 
     Args:
         psd (np.ndarray): Power Spectral Density array (epochs, channels, freqs).
@@ -165,12 +181,28 @@ def calculate_band_power(psd, frequencies, fmin, fmax):
         fmax (float): Upper bound of the frequency band.
 
     Returns:
-        np.ndarray: Mean power for the band across all epochs/channels.
+        np.ndarray: Mean power (dB) for the band across all epochs (averaged across channels).
     """
     idx = np.logical_and(frequencies >= fmin, frequencies <= fmax)
 
-    power = psd[:, :, idx].mean(axis=(1, 2)) * 1e12
-    return power
+    # Frequency resolution (bin width)
+    freq_res = frequencies[1] - frequencies[0]
+
+    # Integration: Sum of density * frequency resolution (dx).
+    # This converts "Density" (uV^2/Hz) back into physical "Power" (uV^2).
+    # Multiply by 1e12 to convert Volts^2 to microVolts^2 (more human readable).
+    band_power = psd[:, :, idx].sum(axis=2) * freq_res * 1e12
+
+    # Avoid log(0) - though unlikely with real EEG
+    band_power = np.maximum(band_power, 1e-10)
+
+    # Coversion to Decibels (dB)
+    band_power_db = 10 * np.log10(band_power)
+
+    # Average the power across all selected EEG channels (Fpz-Cz and Pz-Oz).
+    # In a more complex study, Frontal and Occipital might be analyzed separately,
+    # but for this portfolio summary, a global average is sufficient.
+    return band_power_db.mean(axis=1)
 
 
 def main():

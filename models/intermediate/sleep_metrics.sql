@@ -5,7 +5,9 @@ with
         select
             *,
 
-            -- Deep sleep
+            -- Deep sleep (delta) logic
+            -- Use a rolling average over the last 5 epochs (2.5 minutes)
+            -- Smoothing gives the trend of deep sleep
             avg(delta_power_uv) over (
                 partition by subject_id
                 order by epoch_idx
@@ -40,7 +42,10 @@ with
                 rows between 4 preceding and current row
             ) as alpha_moving_avg,
 
-            -- Was there a transition in sleep stage?
+            -- Transition detection
+            -- Look at the previous row (LAG) and compare it to current
+            -- If they are different (e.g., N2 -> N3), that's a transition
+            -- High transition counts can indicate fragmented sleep
             case
                 when
                     lag(sleep_stage) over (partition by subject_id order by epoch_idx)
