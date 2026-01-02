@@ -29,12 +29,12 @@ class DuckDBClient(WarehouseClient):
         """
         connection = duckdb.connect(self.db_path)
         try:
-            # Delete existing records for subject
+            # Deletes existing records for subject
             connection.execute(
                 "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = ?", (subject_id,)
             )
 
-            # Define explicit column mapping
+            # Defines explicit column mapping
             columns = [
                 "SUBJECT_ID",
                 "EPOCH_IDX",
@@ -46,9 +46,9 @@ class DuckDBClient(WarehouseClient):
                 "BETA_POWER",
             ]
 
-            # Insert new records using explicit column list.
-            # Leverages DuckDB's ability to query local pandas DataFrames directly ('FROM df')
-            # for high-performance interactions causing minimal overhead.
+            # Inserts new records using explicit column list
+            # Leverages DuckDB's ability to query local pandas dataframes directly ('FROM df')
+            # for high-performance interactions causing minimal overhead
             query = f"""
                 INSERT INTO SLEEP_EPOCHS ({", ".join(columns)})
                 SELECT {", ".join(columns)}

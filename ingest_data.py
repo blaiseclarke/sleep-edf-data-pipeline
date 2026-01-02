@@ -89,8 +89,7 @@ def process_subject(subject_id):
     annotations = mne.read_annotations(hypnogram_file)
     raw.set_annotations(annotations, emit_warning=False)
 
-    # Renaming channel names to match our schema.
-    # Standardizes channel names to ensure consistency across different studies.
+    # Standardizes channel names to ensure consistency across studies
     mapping = {
         "EEG Fpz-Cz": "EEG",
         "EEG Pz-Oz": "EEG2",
@@ -100,8 +99,7 @@ def process_subject(subject_id):
     map = {k: v for k, v in mapping.items() if k in raw.ch_names}
     raw.rename_channels(map)
 
-    # Building epochs
-    # Slices the continuous signal into 30-second windows (standard for sleep scoring).
+    # Slices continuous signal into 30-second windows (standard for sleep scoring)
     events, event_id = mne.events_from_annotations(
         raw, event_id=None, chunk_duration=EPOCH_LENGTH
     )
@@ -119,24 +117,24 @@ def process_subject(subject_id):
         on_missing="ignore",
     )
 
-    # Calculating power across bands
+    # Calculates power across bands
     spectrum = epochs.compute_psd(picks=["eeg"])
     psd, frequencies = spectrum.get_data(return_freqs=True)
 
-    # Create dataframe
+    # Creates dataframe
     df = pd.DataFrame()
     df["epoch_idx"] = range(len(epochs))
     df["subject_id"] = subject_id
     df["sleep_stage_label"] = epochs.events[:, 2]
 
-    # Map integers back to strings
+    # Maps integers back to strings
     inverse_map = {v: k for k, v in event_id.items()}
     df["sleep_stage_label"] = df["sleep_stage_label"].map(inverse_map)
 
-    # Cleaning sleep stage names
+    # Cleans sleep stage names
     df["stage"] = df["sleep_stage_label"].apply(lambda x: SLEEP_STAGE_MAP.get(x, x))
 
-    # Add power to dataframe
+    # Adds power to dataframe
     df["delta_power"] = calculate_band_power(psd, frequencies, 0.5, 4)
     df["theta_power"] = calculate_band_power(psd, frequencies, 4, 8)
     df["alpha_power"] = calculate_band_power(psd, frequencies, 8, 12)

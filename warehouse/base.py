@@ -4,7 +4,7 @@ import pandas as pd
 
 class WarehouseClient(Protocol):
     """
-    A blueprint that all database clients must follow.
+    Blueprint that all database clients must follow.
     Ensures the pipeline can interact with DuckDB, Snowflake, or other databases
     using a consistent interface.
     """

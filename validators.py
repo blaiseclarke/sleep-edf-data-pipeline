@@ -1,9 +1,9 @@
 import pandera.pandas as pa
 
-# Define the Data Quality Schema.
-# Uses Pandera to validate data before persistence.
+# Defines the data quality schema
+# Uses Pandera to validate data before persistence
 # Raises an error immediately if invalid values (e.g., negative power)
-# or non-standard sleep stages are detected.
+# or non-standard sleep stages are detected
 SleepSchema = pa.DataFrameSchema(
     {
         "subject_id": pa.Column(int),
