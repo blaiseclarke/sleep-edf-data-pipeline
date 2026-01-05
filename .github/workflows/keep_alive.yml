@@ -21,6 +21,9 @@ jobs:
           echo "$(date)" > Assets/timestamp.txt
           cat Assets/timestamp.txt
 
+      - name: Ping App
+        run: curl -I https://sleepedf-demo.streamlit.app/
+
       - name: Commit and push changes
         uses: EndBug/add-and-commit@v9
         with:
