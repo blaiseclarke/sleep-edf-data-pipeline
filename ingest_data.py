@@ -1,8 +1,9 @@
-import os
 import logging
+import os
+
+import mne
 import numpy as np
 import pandas as pd
-import mne
 from dotenv import load_dotenv
 from mne.datasets.sleep_physionet.age import fetch_data as fetch_age_data
 from mne.datasets.sleep_physionet.temazepam import fetch_data as fetch_telemetry_data
@@ -73,7 +74,7 @@ def process_subject(subject_id):
     """
     filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
     if not filepaths:
-        # Sometimes Recording 1 is corrupt or missing. Fallback to Recording 2 
+        # Sometimes Recording 1 is corrupt or missing. Fallback to Recording 2
         # to ensure *some* data is retrieved for this subject, rather than failing entirely.
         logger.warning(
             f"Subject {subject_id} missing recording {RECORDING}. Attempting fallback to recording {RECORDING + 1}."
@@ -87,11 +88,11 @@ def process_subject(subject_id):
     hypnogram_file = filepaths[0][1]
 
     # Loading raw data
-    raw = mne.io.read_raw_edf(psg_file, preload=True, verbose=False)
+    raw = mne.io.read_raw_edf(psg_file, preload=False, verbose=False)
     annotations = mne.read_annotations(hypnogram_file)
     raw.set_annotations(annotations, emit_warning=False)
 
-    # Rename channels to standard names so downstream analysis doesn't care if 
+    # Rename channels to standard names so downstream analysis doesn't care if
     # the original file used "EEG Fpz-Cz" or just "Fpz".
     # Aim for a unified schema: EEG, EOG, EMG.
     mapping = {

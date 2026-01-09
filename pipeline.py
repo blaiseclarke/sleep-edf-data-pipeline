@@ -1,51 +1,96 @@
 import os
+import shutil
 import traceback
-import pandas as pd
-from prefect import task, flow, get_run_logger
+from pathlib import Path
 
+import pandas as pd
+from pandera.errors import SchemaErrors
+from prefect import flow, get_run_logger, task
+from prefect.task_runners import ConcurrentTaskRunner
+
+from ingest.processing import batch_process_file
 from ingest_data import (
-    process_subject,
-    fetch_data,
-    STARTING_SUBJECT,
     ENDING_SUBJECT,
     RECORDING,
+    STARTING_SUBJECT,
     STUDY,
+    fetch_data,
 )
-from warehouse.factory import get_warehouse_client
-from warehouse.base import WarehouseClient
 from validators import SleepSchema
-from pandera.errors import SchemaErrors
-from prefect.task_runners import ConcurrentTaskRunner
+from warehouse.base import WarehouseClient
+from warehouse.factory import get_warehouse_client
 
 
 @task(retries=2, retry_delay_seconds=10)
-def extract_subject_data(subject_id: int) -> dict:
+def extract_to_parquet(subject_id: int) -> dict:
     """
-    Locates and extracts subject data from local EDF files.
-    
-    This is kept separate from validation to debug extraction errors 
-    (ex. missing files, corrupt headers) independently of data quality errors.
+    Consumes the generator and writes batches to partitioned Parquet files.
+    Returns the directory path where files were saved.
     """
     logger = get_run_logger()
     logger.info(f"Starting extraction for subject {subject_id}")
 
-    try:
-        df = process_subject(subject_id)
+    # Create a staging directory for this subject
+    # ex. data/staging/subject_1/
+    staging_dir = Path(f"data/staging/subject_{subject_id}")
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)  # Clean start
+    staging_dir.mkdir(parents=True, exist_ok=True)
 
-        if df is None or df.empty:
+    try:
+        # Get the paths
+        filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
+        if not filepaths:
+            return {"subject_id": subject_id, "path": None, "error": "No files found"}
+
+        psg_path, hypno_path = filepaths[0]
+
+        # Initialize generator
+        record_generator = batch_process_file(
+            subject_id=subject_id,
+            psg_path=psg_path,
+            hypno_path=hypno_path,
+            batch_size=100,  # Process 3000 seconds of audio at a time
+        )
+
+        total_batches = 0
+
+        # CONSUME GENERATOR
+        for i, df_batch in enumerate(record_generator):
+            if df_batch.empty:
+                continue
+
+            # Validate immediately (Fail Fast)
+            # We validate here so we don't save bad data to disk
+            validated_df = SleepSchema.validate(df_batch, lazy=True)
+
+            # Write to Parquet (Snappy compression is default and good)
+            # Format: part_0.parquet, part_1.parquet
+            file_path = staging_dir / f"part_{i}.parquet"
+            validated_df.to_parquet(file_path, index=False)
+            total_batches += 1
+
+        if total_batches == 0:
             return {
                 "subject_id": subject_id,
-                "data": None,
-                "error": {"type": "NoData", "message": "No data returned"},
+                "path": None,
+                "error": "No epochs processed",
             }
 
-        return {"subject_id": subject_id, "data": df, "error": None}
+        return {"subject_id": subject_id, "path": str(staging_dir), "error": None}
 
-    except Exception as e:
-        logger.error(f"Extraction failed for subject {subject_id}: {str(e)}")
+    except SchemaErrors as e:
+        logger.error(f"Validation failed for subject {subject_id}: {e}")
         return {
             "subject_id": subject_id,
-            "data": None,
+            "path": None,
+            "error": {"type": "SchemaError", "message": str(e)},
+        }
+    except Exception as e:
+        logger.error(f"Extraction failed for subject {subject_id}: {e}")
+        return {
+            "subject_id": subject_id,
+            "path": None,
             "error": {
                 "type": type(e).__name__,
                 "message": str(e),
@@ -55,120 +100,78 @@ def extract_subject_data(subject_id: int) -> dict:
 
 
 @task
-def validate_data(df: pd.DataFrame, subject_id: int) -> dict:
+def load_parquet_to_warehouse(
+    client: WarehouseClient, staging_path: str, subject_id: int
+):
     """
-    Validates raw DataFrame records against the Pandera SleepSchema.
-    
-    This acts as a gatekeeper: if the data contains negative power values or 
-    unknown sleep stages, it is rejected *before* it gets to the database.
-    This prevents "garbage in, garbage out" in the downstream dashboard.
+    Reads partitioned Parquet files and loads them to the warehouse.
     """
     logger = get_run_logger()
+    path_obj = Path(staging_path)
 
-    try:
-        validated_df = SleepSchema.validate(df, lazy=True)
-        return {"subject_id": subject_id, "data": validated_df, "error": None}
-    except SchemaErrors as e:
-        logger.error(f"Validation failed for subject {subject_id}: {str(e)}")
-        return {
-            "subject_id": subject_id,
-            "data": None,
-            "error": {
-                "type": "SchemaErrors",
-                "message": str(e),
-                "stack_trace": traceback.format_exc(),
-            },
-        }
+    if not path_obj.exists():
+        logger.warning(f"Staging path {staging_path} does not exist.")
+        return
 
+    # Gather all partition files
+    parquet_files = sorted(path_obj.glob("*.parquet"))
 
-@task
-def process_subject_task(subject_id: int) -> dict:
-    """Composite task to handle extraction and validation for a single subject."""
-    result = extract_subject_data(subject_id)
+    logger.info(f"Loading {len(parquet_files)} batches for subject {subject_id}...")
 
-    if result["error"]:
-        return result
+    # Load file by file (or bulk load if the warehouse supports it)
+    # DuckDB can actually query the whole folder: "SELECT * FROM '.../*.parquet'"
+    # But for now, let's keep it explicit to match your Client interface.
 
-    return validate_data(result["data"], subject_id)
+    # Optional: Read all parts into one DF if memory allows, OR loop and load.
+    # Since we designed this for memory safety, let's loop.
+    for p_file in parquet_files:
+        df = pd.read_parquet(p_file)
+        # Ensure uppercase for Snowflake compatibility
+        df.columns = [c.upper() for c in df.columns]
+        client.load_epochs(df, subject_id)
 
-
-@task
-def load_to_warehouse(client: WarehouseClient, df: pd.DataFrame, subject_id: int):
-    """Persists subject data to the configured warehouse."""
-    logger = get_run_logger()
-    logger.info(f"Loading data for subject {subject_id} to warehouse...")
-    client.load_epochs(df, subject_id)
+    # Cleanup (Optional: remove staging files after successful load)
+    # shutil.rmtree(path_obj)
 
 
-@flow(
-    name="Sleep-EDF Ingestion Pipeline",
-    task_runner=ConcurrentTaskRunner(
-        max_workers=int(os.getenv("PREFECT_MAX_WORKERS", "3"))
-    ),
-)
+@flow(name="Sleep-EDF Ingestion Pipeline")
 def run_ingestion_pipeline():
-    """
-    Executes the ingestion pipeline.
-    
-    1. EXTRACT/TRANSFORM: Run `process_subject_task` in parallel because 
-       signal processing is CPU intensive and the subjects are independent.
-    2. LOAD: Switch to a sequential loop to write to the database.
-       This is done because SQLite/DuckDB (the local DBs) can lock up or corrupt 
-       files if multiple processes try to write to them simultaneously.
-    """
     logger = get_run_logger()
     warehouse_client = get_warehouse_client()
 
     subject_ids = list(range(STARTING_SUBJECT, ENDING_SUBJECT + 1))
 
-    # 1. Pre-fetch data
-    # logical step: download everything first
-    logger.info(
-        f"Ensuring data is available for subjects {subject_ids} in study '{STUDY}'"
-    )
+    # 1. Download Data
+    logger.info("Ensuring data is available...")
     fetch_data(subjects=subject_ids, recording=[RECORDING])
 
-    # 2. Processes data in parallel
-    # Uses .map() to execute the processing task for all subjects 
-    # concurrently, leveraging available CPU cores
-    processed_results = process_subject_task.map(subject_ids)
+    # 2. Extract & Validate (Parallel) -> Writes to Disk
+    # This returns a list of result dicts
+    extraction_results = extract_to_parquet.map(subject_ids)
 
-    # 3. Serial write
-    # Deliberately write one subject at a time
-    # While slower, this guarantees the database file never gets corrupted
-    # by concurrent write attempts
-    for subject_id, result_future in zip(subject_ids, processed_results):
+    # 3. Load to Warehouse (Serial) -> Reads from Disk
+    for subject_id, result_future in zip(subject_ids, extraction_results):
         try:
             result = result_future.result()
 
-            if result["error"]:
+            if result.get("error"):
                 err = result["error"]
-                logger.warning(
-                    f"Subject {subject_id} failed {err['type']}: {err['message']}"
-                )
+                # Handle nested error dicts or string errors
+                msg = err["message"] if isinstance(err, dict) else str(err)
+                logger.warning(f"Skipping subject {subject_id}: {msg}")
                 warehouse_client.log_ingestion_error(
                     subject_id=subject_id,
-                    error_type=err["type"],
-                    error_message=err["message"],
-                    stack_trace=err.get("stack_trace"),
+                    error_type="ExtractionFailed",
+                    error_message=msg,
                 )
                 continue
 
-            clean_df = result["data"]
-            if clean_df is not None:
-                # Ensure columns are uppercase to match warehouse schema
-                clean_df.columns = [c.upper() for c in clean_df.columns]
-                load_to_warehouse(warehouse_client, clean_df, subject_id)
+            staging_path = result["path"]
+            if staging_path:
+                load_parquet_to_warehouse(warehouse_client, staging_path, subject_id)
 
         except Exception as e:
-            error_msg = f"Critical failure in coordination loop for subject {subject_id}: {str(e)}"
-            logger.error(error_msg)
-            warehouse_client.log_ingestion_error(
-                subject_id=subject_id,
-                error_type=type(e).__name__,
-                error_message=str(e),
-                stack_trace=traceback.format_exc(),
-            )
+            logger.error(f"Pipeline loop failed for subject {subject_id}: {e}")
 
     logger.info("Pipeline finished!")
 
