@@ -23,13 +23,13 @@ def get_subjects():
 def load_subject_data(subject_id):
     """Fetch all data for a single subject."""
     con = duckdb.connect(DB_PATH, read_only=True)
-    query = f"""
+    query = """
         SELECT * 
         FROM SLEEP_EPOCHS 
-        WHERE SUBJECT_ID = {subject_id}
+        WHERE SUBJECT_ID = ?
         ORDER BY EPOCH_IDX
     """
-    df = con.execute(query).df()
+    df = con.execute(query, [subject_id]).df()
     con.close()
     return df
 
