@@ -29,7 +29,6 @@ def extract_to_parquet(subject_id: int) -> dict:
     logger = get_run_logger()
     logger.info(f"Starting extraction for subject {subject_id}")
 
-<<<<<<< HEAD
     # Create a staging directory for this subject
     # ex. data/staging/subject_1/
     staging_dir = Path(f"data/staging/subject_{subject_id}")

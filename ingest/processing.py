@@ -137,6 +137,10 @@ def _features_to_dataframe(
         "beta_power",
     ]
 
+    # Drop epochs that are not valid sleep stages (ex. Movement time, Unscored)
+    # This ensures only W, N1, N2, N3, REM are passed to validation and downstream analysis
+    df = df[~df["stage"].isin(["MOVE", "NAN"])].copy()
+
     # Cast to silence Series/DataFrame ambiguity
     return cast(pd.DataFrame, df[columns])
 
