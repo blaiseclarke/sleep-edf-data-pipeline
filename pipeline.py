@@ -116,12 +116,7 @@ def load_parquet_to_warehouse(
 
     logger.info(f"Loading {len(parquet_files)} batches for subject {subject_id}...")
 
-    # Load file by file (or bulk load if the warehouse supports it)
-    # DuckDB can actually query the whole folder: "SELECT * FROM '.../*.parquet'"
-    # But for now, let's keep it explicit to match your Client interface.
-
-    # Optional: Read all parts into one DF if memory allows, OR loop and load.
-    # Since we designed this for memory safety, let's loop.
+    # Load file by file
     for i, p_file in enumerate(parquet_files):
         df = pd.read_parquet(p_file)
         # Ensure uppercase for Snowflake compatibility
@@ -130,9 +125,6 @@ def load_parquet_to_warehouse(
         # Only overwrite on the first batch, append (retain) for subsequent batches
         overwrite = (i == 0)
         client.load_epochs(df, subject_id, overwrite=overwrite)
-
-    # Cleanup (Optional: remove staging files after successful load)
-    # shutil.rmtree(path_obj)
 
 
 @flow(name="Sleep-EDF Ingestion Pipeline")
