@@ -1,5 +1,5 @@
 with
-    -- Read directly from the "eeg_raw" table where the pipeline dumped the CSVs
+    -- Read directly from the "eeg_raw" table where the pipeline loaded the data
     source as (select * from {{ source("eeg_raw", "SLEEP_EPOCHS") }}),
 
     cleaned as (

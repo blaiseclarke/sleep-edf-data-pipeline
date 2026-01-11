@@ -5,88 +5,98 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 
-# --- Configuration ---
+# Configuration
 st.set_page_config(page_title="Sleep Data Viewer", layout="wide")
 
 DB_PATH = os.getenv("DB_PATH", "data/sleep_data.db")
 
-# --- Data loading ---
+# Data loading
 @st.cache_data
 def get_subjects():
-    """Fetch list of available subjects."""
+    """Fetch list of available subjects from the summary mart."""
     con = duckdb.connect(DB_PATH, read_only=True)
-    df = con.execute("SELECT DISTINCT SUBJECT_ID FROM SLEEP_EPOCHS ORDER BY SUBJECT_ID").df()
-    con.close()
-    return df["SUBJECT_ID"].tolist()
+    try:
+        df = con.execute("SELECT subject_id FROM sleep_summary ORDER BY subject_id").df()
+        return df["subject_id"].tolist()
+    except duckdb.CatalogException:
+        st.error("dbt models not found. Run `dbt run` first.")
+        return []
+    finally:
+        con.close()
 
 @st.cache_data
-def load_subject_data(subject_id):
-    """Fetch all data for a single subject."""
-    con = duckdb.connect(DB_PATH, read_only=True)
-    query = """
-        SELECT * 
-        FROM SLEEP_EPOCHS 
-        WHERE SUBJECT_ID = ?
-        ORDER BY EPOCH_IDX
+def load_analysis_data(subject_id):
     """
-    df = con.execute(query, [subject_id]).df()
+    Fetch data from dbt models:
+    1. Summary Metrics 
+    2. Epoch Metrics
+    """
+    con = duckdb.connect(DB_PATH, read_only=True)
+    
+    # 1. Get high-level summary
+    summary_query = """
+        SELECT * 
+        FROM sleep_summary 
+        WHERE subject_id = ?
+    """
+    summary_df = con.execute(summary_query, [subject_id]).df()
+    
+    # 2. Get epoch data
+    epoch_query = """
+        SELECT 
+            epoch_idx, 
+            sleep_stage, 
+            is_stage_transition
+        FROM sleep_metrics 
+        WHERE subject_id = ?
+        ORDER BY epoch_idx
+    """
+    epoch_df = con.execute(epoch_query, [subject_id]).df()
+    
     con.close()
-    return df
+    return summary_df, epoch_df
 
 st.title("Sleep-EDF Data Viewer")
 
 # Sidebar
 subject_list = get_subjects()
-selected_subject = st.sidebar.selectbox("Subject ID", subject_list)
 
-if selected_subject is None:
-    st.text("No data found.")
+if not subject_list:
+    st.warning("No subjects found in analytics tables.")
     st.stop()
 
-# Load subject data
-df = load_subject_data(selected_subject)
+selected_subject = st.sidebar.selectbox("Subject ID", subject_list)
 
-# Calculate metrics
-total_epochs = len(df)
-tst_pages = df[df["STAGE"] != "W"]
-tst_minutes = (len(tst_pages) * 30) / 60
+# Load data
+summary_row, epoch_df = load_analysis_data(selected_subject)
 
-# Sleep architecture
-counts = df["STAGE"].value_counts()
-total_sleep_epochs = len(tst_pages)
+if summary_row.empty:
+    st.error(f"No summary data found for Subject {selected_subject}")
+    st.stop()
 
-if total_sleep_epochs > 0:
-    deep_pct = (counts.get("N3", 0) / total_sleep_epochs) * 100
-    light_pct = ((counts.get("N1", 0) + counts.get("N2", 0)) / total_sleep_epochs) * 100
-    rem_pct = (counts.get("REM", 0) / total_sleep_epochs) * 100
-else:
-    deep_pct = light_pct = rem_pct = 0.0
-
-# Awakenings (bouts of Wake after sleep onset)
-df["prev_stage"] = df["STAGE"].shift(1)
-awakenings = len(df[(df["STAGE"] == "W") & (df["prev_stage"] != "W") & (df["prev_stage"].notna())])
+metrics = summary_row.iloc[0]
 
 c1, c2, c3, c4, c5 = st.columns(5)
 
-c1.metric("Total Sleep Time", f"{tst_minutes:.1f} min")
-c2.metric("Awakenings", awakenings)
-c3.metric("Deep Sleep %", f"{deep_pct:.1f}%")
-c4.metric("Light Sleep %", f"{light_pct:.1f}%")
-c5.metric("REM Sleep %", f"{rem_pct:.1f}%")
+c1.metric("Total Sleep Time", f"{metrics['total_sleep_minutes']:.1f} min")
+c2.metric("Awakenings", int(metrics['number_of_awakenings']))
+c3.metric("Deep Sleep %", f"{metrics['deep_sleep_percentage'] * 100:.1f}%")
+c4.metric("Light Sleep %", f"{metrics['light_sleep_percentage'] * 100:.1f}%")
+c5.metric("REM Sleep %", f"{metrics['rem_sleep_percentage'] * 100:.1f}%")
 
-# --- Temporal analysis ---
+# Temporal analysis
 st.subheader("Sleep Staging")
 
 # Map stages to numbers for plotting
 stage_map = {"W": 0, "REM": 1, "N1": 2, "N2": 3, "N3": 4, "MOVE": 0, "NAN": 0}
 
-df["stage_num"] = df["STAGE"].map(stage_map)
-df["time_min"] = df.index * 0.5
+epoch_df["stage_num"] = epoch_df["sleep_stage"].map(stage_map)
+epoch_df["time_min"] = epoch_df["epoch_idx"] * 0.5  # 30s epochs
 
 fig_hypno = go.Figure()
 fig_hypno.add_trace(go.Scatter(
-    x=df["time_min"], 
-    y=df["stage_num"], 
+    x=epoch_df["time_min"], 
+    y=epoch_df["stage_num"], 
     mode='lines',
     line_shape='hv',
     name="Stage",
@@ -110,19 +120,26 @@ fig_hypno.update_layout(
 )
 st.plotly_chart(fig_hypno, use_container_width=True)
 
-# --- Spectral analysis ---
+# Spectral analysis
 c_left, c_right = st.columns(2)
 
 with c_left:
     st.subheader("Average Band Power (dB)")
     
-    power_cols = ["DELTA_POWER", "THETA_POWER", "ALPHA_POWER", "SIGMA_POWER", "BETA_POWER"]
-    avg_powers = df[power_cols].mean().reset_index()
-    avg_powers.columns = ["Band", "dB"]
+    # We query the pre-calculated averages from the Mart
+    power_data = {
+        "Delta": metrics["avg_delta_power"],
+        "Theta": metrics["avg_theta_power"],
+        "Alpha": metrics["avg_alpha_power"],
+        "Sigma": metrics["avg_sigma_power"],
+        "Beta":  metrics["avg_beta_power"]
+    }
+    
+    df_power = pd.DataFrame(list(power_data.items()), columns=["Band", "dB"])
     
     # Simple grey bars
     fig_bar = px.bar(
-        avg_powers, 
+        df_power, 
         x='Band', 
         y='dB',
         text_auto='.1f'
@@ -138,8 +155,19 @@ with c_left:
 with c_right:
     st.subheader("Stage Distribution")
     
-    stage_counts = df["STAGE"].value_counts().reset_index()
-    stage_counts.columns = ["Stage", "Count"]
+    # Create distribution table from summary metrics
+    dist_data = {
+        "Stage": ["Deep (N3)", "Light (N1/N2)", "REM"],
+        "Minutes": [
+            metrics["deep_sleep_minutes"], 
+            metrics["light_sleep_minutes"], 
+            metrics["rem_sleep_minutes"]
+        ],
+        "Percentage": [
+            f"{metrics['deep_sleep_percentage']*100:.1f}%",
+            f"{metrics['light_sleep_percentage']*100:.1f}%",
+            f"{metrics['rem_sleep_percentage']*100:.1f}%"
+        ]
+    }
     
-    # Simple table instead of chart
-    st.dataframe(stage_counts, use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(dist_data), use_container_width=True, hide_index=True)
