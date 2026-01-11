@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import duckdb
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from pipeline import run_ingestion_pipeline
 from warehouse.duckdb_client import DuckDBClient
 from scripts.setup_db import setup_database
@@ -24,7 +24,7 @@ def integration_db(tmp_path, monkeypatch):
     return db_file
 
 
-def test_pipeline_parallel_ingestion_integration(integration_db):
+def test_pipeline_parallel_ingestion_integration(integration_db, tmp_path):
     """
     End-to-End test of the ingestion pipeline:
     Extraction (Mocked) -> Validation (Pandera) -> Load (DuckDB).
@@ -43,13 +43,23 @@ def test_pipeline_parallel_ingestion_integration(integration_db):
         }
     )
 
-    # 2. Patch core extraction and flow control variables
-    with patch("pipeline.extract_subject_data") as mock_extract:
-        mock_extract.return_value = {
+    # 2. Patch extract_to_parquet (the new generator-based task)
+    with patch("pipeline.extract_to_parquet") as mock_extract:
+        # Prepare staging area
+        staging_dir = tmp_path / "staging_mock"
+        staging_dir.mkdir()
+        # Write mock data to Parquet so the loader can find it
+        mock_df.to_parquet(staging_dir / "batch_1.parquet")
+
+        # Mock the Prefect task `.map()` return value
+        # The pipeline expects a list of futures, one per subject
+        mock_future = MagicMock()
+        mock_future.result.return_value = {
             "subject_id": 1,
-            "data": mock_df,
+            "path": str(staging_dir),
             "error": None,
         }
+        mock_extract.map.return_value = [mock_future]
 
         # Control the flow to only process a single subject (ID 1)
         with patch("pipeline.STARTING_SUBJECT", 1), patch("pipeline.ENDING_SUBJECT", 1):
