@@ -29,29 +29,17 @@ def extract_subject_data(subject_id: int) -> dict:
     logger = get_run_logger()
     logger.info(f"Starting extraction for subject {subject_id}")
 
-    try:
-        df = process_subject(subject_id)
+    # try/except block removed to allow Prefect retries to trigger on transient errors
+    df = process_subject(subject_id)
 
-        if df is None or df.empty:
-            return {
-                "subject_id": subject_id,
-                "data": None,
-                "error": {"type": "NoData", "message": "No data returned"},
-            }
-
-        return {"subject_id": subject_id, "data": df, "error": None}
-
-    except Exception as e:
-        logger.error(f"Extraction failed for subject {subject_id}: {str(e)}")
+    if df is None or df.empty:
         return {
             "subject_id": subject_id,
             "data": None,
-            "error": {
-                "type": type(e).__name__,
-                "message": str(e),
-                "stack_trace": traceback.format_exc(),
-            },
+            "error": {"type": "NoData", "message": "No data returned"},
         }
+
+    return {"subject_id": subject_id, "data": df, "error": None}
 
 
 @task
@@ -84,6 +72,9 @@ def validate_data(df: pd.DataFrame, subject_id: int) -> dict:
 @task
 def process_subject_task(subject_id: int) -> dict:
     """Composite task to handle extraction and validation for a single subject."""
+    # We allow extract_subject_data to raise exceptions so that retries kick in.
+    # We also allow those exceptions to bubble up here so that the Task shows as "Failed" 
+    # in the UI if retries are exhausted. The Flow loop will catch the exception via .result().
     result = extract_subject_data(subject_id)
 
     if result["error"]:
