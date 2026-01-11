@@ -31,9 +31,7 @@ def fetch_data(subjects, recording):
         list[list[str]]: A list of [psg_path, hypnogram_path] pairs for each subject.
     """
     if STUDY == "telemetry":
-        return fetch_telemetry_data(
-            subjects=subjects, recording=recording, on_missing="warn"
-        )
+        return fetch_telemetry_data(subjects=subjects, on_missing="warn")
     return fetch_age_data(subjects=subjects, recording=recording, on_missing="warn")
 
 
