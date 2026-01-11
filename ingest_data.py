@@ -123,8 +123,14 @@ def process_subject(subject_id):
     # Calculate Power Spectral Density (PSD) using Welch's Method.
     # Use a 2.56s window which gives ~0.39 Hz frequency resolution.
     # This is fine-grained enough to separate Delta (0.5-4Hz) from Theta (4-8Hz).
+    # Explicitly pick both standardized EEG channels ("EEG", "EEG2") to ensure Pz-Oz is included.
     spectrum = epochs.compute_psd(
-        method="welch", picks=["eeg"], fmin=0.5, fmax=30.0, n_fft=256, n_per_seg=256
+        method="welch",
+        picks=["EEG", "EEG2"],
+        fmin=0.5,
+        fmax=30.0,
+        n_fft=256,
+        n_per_seg=256,
     )
     psd, frequencies = spectrum.get_data(return_freqs=True)
 

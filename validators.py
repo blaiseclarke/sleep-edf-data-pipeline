@@ -13,10 +13,10 @@ SleepSchema = pa.DataFrameSchema(
         "stage": pa.Column(
             str, checks=pa.Check.isin(["W", "N1", "N2", "N3", "REM", "MOVE", "NAN"])
         ),
-        "delta_power": pa.Column(float),
-        "theta_power": pa.Column(float),
-        "alpha_power": pa.Column(float),
-        "sigma_power": pa.Column(float),
-        "beta_power": pa.Column(float),
+        "delta_power": pa.Column(float, checks=pa.Check.ge(0)),
+        "theta_power": pa.Column(float, checks=pa.Check.ge(0)),
+        "alpha_power": pa.Column(float, checks=pa.Check.ge(0)),
+        "sigma_power": pa.Column(float, checks=pa.Check.ge(0)),
+        "beta_power": pa.Column(float, checks=pa.Check.ge(0)),
     }
 )

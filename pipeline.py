@@ -2,6 +2,8 @@ import os
 import traceback
 import pandas as pd
 from prefect import task, flow, get_run_logger
+from prefect.task_runners import ConcurrentTaskRunner
+from pandera.errors import SchemaErrors
 
 from ingest_data import (
     process_subject,
@@ -12,10 +14,7 @@ from ingest_data import (
     STUDY,
 )
 from warehouse.factory import get_warehouse_client
-from warehouse.base import WarehouseClient
 from validators import SleepSchema
-from pandera.errors import SchemaErrors
-from prefect.task_runners import ConcurrentTaskRunner
 
 
 @task(retries=2, retry_delay_seconds=10)
@@ -56,6 +55,7 @@ def validate_data(df: pd.DataFrame, subject_id: int) -> dict:
     try:
         validated_df = SleepSchema.validate(df, lazy=True)
         return {"subject_id": subject_id, "data": validated_df, "error": None}
+
     except SchemaErrors as e:
         logger.error(f"Validation failed for subject {subject_id}: {str(e)}")
         return {
