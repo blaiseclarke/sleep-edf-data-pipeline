@@ -56,17 +56,18 @@ class DuckDBClient(WarehouseClient):
         finally:
             connection.close()
 
-    def load_epochs(self, df: pd.DataFrame, subject_id: int) -> None:
+    def load_epochs(self, df: pd.DataFrame, subject_id: int, overwrite: bool = True) -> None:
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table.
-        Clears existing data for the subject before inserting.
+        Clears existing data for the subject before inserting if overwrite=True.
         """
         connection = duckdb.connect(self.db_path)
         try:
             # Deletes existing records for subject
-            connection.execute(
-                "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = ?", (subject_id,)
-            )
+            if overwrite:
+                connection.execute(
+                    "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = ?", (subject_id,)
+                )
 
             # Defines explicit column mapping
             columns = [

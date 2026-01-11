@@ -49,7 +49,7 @@ class SnowflakeClient(WarehouseClient):
             role=self.role,
         )
 
-    def load_epochs(self, df: pd.DataFrame, subject_id: int) -> None:
+    def load_epochs(self, df: pd.DataFrame, subject_id: int, overwrite: bool = True) -> None:
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table in Snowflake.
         """
@@ -57,11 +57,12 @@ class SnowflakeClient(WarehouseClient):
         try:
             # 1. Clears existing data for this subject (idempotency)
             # Prevents duplicate rows if the pipeline is re-run for a subject
-            # (Snowflake connector uses %s for safe parameter binding)
-            cursor = conn.cursor()
-            cursor.execute(
-                "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = %s", (subject_id,)
-            )
+            # Only runs if overwrite is True (default)
+            if overwrite:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = %s", (subject_id,)
+                )
 
             # 2. Bulk loads new data
             # write_pandas is highly optimized; it transparently uploads the dataframe to a temporary stage

@@ -9,7 +9,7 @@ class WarehouseClient(Protocol):
     using a consistent interface.
     """
 
-    def load_epochs(self, df: pd.DataFrame, subject_id: int) -> None:
+    def load_epochs(self, df: pd.DataFrame, subject_id: int, overwrite: bool = True) -> None:
         """Saves a batch of sleep data to the database."""
         ...
 

@@ -122,11 +122,14 @@ def load_parquet_to_warehouse(
 
     # Optional: Read all parts into one DF if memory allows, OR loop and load.
     # Since we designed this for memory safety, let's loop.
-    for p_file in parquet_files:
+    for i, p_file in enumerate(parquet_files):
         df = pd.read_parquet(p_file)
         # Ensure uppercase for Snowflake compatibility
         df.columns = [c.upper() for c in df.columns]
-        client.load_epochs(df, subject_id)
+        
+        # Only overwrite on the first batch, append (retain) for subsequent batches
+        overwrite = (i == 0)
+        client.load_epochs(df, subject_id, overwrite=overwrite)
 
     # Cleanup (Optional: remove staging files after successful load)
     # shutil.rmtree(path_obj)
