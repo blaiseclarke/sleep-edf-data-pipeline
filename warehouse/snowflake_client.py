@@ -23,6 +23,21 @@ class SnowflakeClient(WarehouseClient):
         self.schema = os.getenv("SNOWFLAKE_SCHEMA")
         self.role = os.getenv("SNOWFLAKE_ROLE", "ACCOUNTADMIN")
 
+        # Validate required credentials
+        missing = []
+        if not self.user:
+            missing.append("SNOWFLAKE_USER")
+        if not self.password:
+            missing.append("SNOWFLAKE_PASSWORD")
+        if not self.account:
+            missing.append("SNOWFLAKE_ACCOUNT")
+
+        if missing:
+            raise ValueError(
+                f"Missing required Snowflake credentials: {', '.join(missing)}. "
+                "Please set these environment variables."
+            )
+
     def _get_connection(self):
         return snowflake.connector.connect(
             user=self.user,

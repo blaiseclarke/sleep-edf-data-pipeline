@@ -32,9 +32,7 @@ def fetch_data(subjects, recording):
         list[list[str]]: A list of [psg_path, hypnogram_path] pairs for each subject.
     """
     if STUDY == "telemetry":
-        return fetch_telemetry_data(
-            subjects=subjects, recording=recording, on_missing="warn"
-        )
+        return fetch_telemetry_data(subjects=subjects, on_missing="warn")
     return fetch_age_data(subjects=subjects, recording=recording, on_missing="warn")
 
 
@@ -56,10 +54,10 @@ logger = logging.getLogger(__name__)
 
 def process_subject(subject_id):
     """
-    Orchestrates the extraction, signal processing, and feature engineering for a single subject.
+    Orchestrates the extraction, signal processing, and feature engineering for one subject.
 
     Logic:
-    1. Fetches raw data (with automatic fallback to Recording 2 if Recording 1 is missing).
+    1. Fetches raw data (with automatic fallback to recording 2 if recording 1 is missing).
     2. Loads EDF files using MNE.
     3. Standardizes channel names.
     4. Segments data into 30s epochs.
@@ -75,7 +73,7 @@ def process_subject(subject_id):
     filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
     if not filepaths:
         # Sometimes Recording 1 is corrupt or missing. Fallback to Recording 2
-        # to ensure *some* data is retrieved for this subject, rather than failing entirely.
+        # to ensure *some* data is retrieved for this subject, rather than failing entirely
         logger.warning(
             f"Subject {subject_id} missing recording {RECORDING}. Attempting fallback to recording {RECORDING + 1}."
         )
@@ -93,8 +91,8 @@ def process_subject(subject_id):
     raw.set_annotations(annotations, emit_warning=False)
 
     # Rename channels to standard names so downstream analysis doesn't care if
-    # the original file used "EEG Fpz-Cz" or just "Fpz".
-    # Aim for a unified schema: EEG, EOG, EMG.
+    # the original file used "EEG Fpz-Cz" or just "Fpz"
+    # Aim for a unified schema: EEG, EOG, EMG
     mapping = {
         "EEG Fpz-Cz": "EEG",
         "EEG Pz-Oz": "EEG2",
@@ -104,8 +102,8 @@ def process_subject(subject_id):
     map = {k: v for k, v in mapping.items() if k in raw.ch_names}
     raw.rename_channels(map)
 
-    # Identify sleep stages from the hypnogram.
-    # Chunk the data into 30s epochs because that's the clinical standard for sleep scoring.
+    # Identify sleep stages from the hypnogram
+    # Chunk the data into 30s epochs because that's the clinical standard for sleep scoring
     events, event_id = mne.events_from_annotations(
         raw, event_id=None, chunk_duration=EPOCH_LENGTH
     )
@@ -123,11 +121,17 @@ def process_subject(subject_id):
         on_missing="ignore",
     )
 
-    # Calculate Power Spectral Density (PSD) using Welch's Method.
-    # Use a 2.56s window which gives ~0.39 Hz frequency resolution.
-    # This is fine-grained enough to separate Delta (0.5-4Hz) from Theta (4-8Hz).
+    # Calculate PSD using Welch's Method
+    # Use a 2.56s window which gives ~0.39 Hz frequency resolution
+    # This is fine-grained enough to separate Delta (0.5-4Hz) from Theta (4-8Hz)
+    # Explicitly pick both standardized EEG channels ("EEG", "EEG2") to ensure Pz-Oz is included
     spectrum = epochs.compute_psd(
-        method="welch", picks=["eeg"], fmin=0.5, fmax=30.0, n_fft=256, n_per_seg=256
+        method="welch",
+        picks=["EEG", "EEG2"],
+        fmin=0.5,
+        fmax=30.0,
+        n_fft=256,
+        n_per_seg=256,
     )
     psd, frequencies = spectrum.get_data(return_freqs=True)
 
@@ -144,14 +148,18 @@ def process_subject(subject_id):
     # Cleans sleep stage names
     df["stage"] = df["sleep_stage_label"].apply(lambda x: SLEEP_STAGE_MAP.get(x, x))
 
-    # Extract power for specific frequency bands.
-    # Calculate Total Power (Area Under the Curve) and convert it to dB.
-    # This keeps values in a manageable range (e.g., 30-60 dB) rather than massive uV^2 numbers.
+    # Extract power for specific frequency bands
+    # Calculate total power (area under the curve) and convert it to dB
+    # This keeps values in a manageable range (ex. 30-60 dB) rather than massive uV^2 numbers
     df["delta_power"] = calculate_band_power(psd, frequencies, 0.5, 4)
     df["theta_power"] = calculate_band_power(psd, frequencies, 4, 8)
     df["alpha_power"] = calculate_band_power(psd, frequencies, 8, 12)
     df["sigma_power"] = calculate_band_power(psd, frequencies, 12, 16)
     df["beta_power"] = calculate_band_power(psd, frequencies, 16, 30)
+
+    # Drop epochs that are not valid sleep stages (ex. Movement time, Unscored)
+    # This ensures only W, N1, N2, N3, REM are passed to validation and downstream analysis
+    df = df[~df["stage"].isin(["MOVE", "NAN"])].copy()
 
     columns = [
         "subject_id",
@@ -189,9 +197,9 @@ def calculate_band_power(psd, frequencies, fmin, fmax):
     # Frequency resolution (bin width)
     freq_res = frequencies[1] - frequencies[0]
 
-    # Integration: Sum of density * frequency resolution (dx).
-    # This converts "Density" (uV^2/Hz) back into physical "Power" (uV^2).
-    # Multiply by 1e12 to convert Volts^2 to microVolts^2 (more human readable).
+    # Integration: Sum of density * frequency resolution (dx)
+    # This converts "Density" (uV^2/Hz) back into physical "Power" (uV^2)
+    # Multiply by 1e12 to convert Volts^2 to microVolts^2 (more human readable)
     band_power = psd[:, :, idx].sum(axis=2) * freq_res * 1e12
 
     # Avoid log(0) - though unlikely with real EEG
@@ -200,9 +208,9 @@ def calculate_band_power(psd, frequencies, fmin, fmax):
     # Coversion to Decibels (dB)
     band_power_db = 10 * np.log10(band_power)
 
-    # Average the power across all selected EEG channels (Fpz-Cz and Pz-Oz).
+    # Average the power across all selected EEG channels (Fpz-Cz and Pz-Oz)
     # In a more complex study, Frontal and Occipital might be analyzed separately,
-    # but for this portfolio summary, a global average is sufficient.
+    # but for this portfolio summary, a global average is sufficient
     return band_power_db.mean(axis=1)
 
 

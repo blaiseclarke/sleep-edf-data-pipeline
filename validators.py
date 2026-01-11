@@ -11,7 +11,7 @@ SleepSchema = pa.DataFrameSchema(
         # Enforce a strict list of allowed strings
         # Everything must be normalized to ["N1", "N2", "N3", "REM", "W"] for the dashboard
         "stage": pa.Column(
-            str, checks=pa.Check.isin(["W", "N1", "N2", "N3", "REM", "MOVE", "NAN"])
+            str, checks=pa.Check.isin(["W", "N1", "N2", "N3", "REM"])
         ),
         "delta_power": pa.Column(float),
         "theta_power": pa.Column(float),

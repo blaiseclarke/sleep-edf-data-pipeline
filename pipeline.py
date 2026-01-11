@@ -1,12 +1,11 @@
-import os
-import shutil
-import traceback
 from pathlib import Path
+from prefect import task, flow, get_run_logger
+from prefect.task_runners import ConcurrentTaskRunner
+from pandera.errors import SchemaErrors
 
 import pandas as pd
-from pandera.errors import SchemaErrors
-from prefect import flow, get_run_logger, task
-from prefect.task_runners import ConcurrentTaskRunner
+import shutil
+import traceback
 
 from ingest.processing import batch_process_file
 from ingest_data import (
@@ -30,6 +29,7 @@ def extract_to_parquet(subject_id: int) -> dict:
     logger = get_run_logger()
     logger.info(f"Starting extraction for subject {subject_id}")
 
+<<<<<<< HEAD
     # Create a staging directory for this subject
     # ex. data/staging/subject_1/
     staging_dir = Path(f"data/staging/subject_{subject_id}")

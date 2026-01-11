@@ -22,6 +22,40 @@ class DuckDBClient(WarehouseClient):
         if self.db_path and os.path.dirname(self.db_path):
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
+        # Initialize tables if they don't exist
+        self._ensure_tables_exist()
+
+    def _ensure_tables_exist(self):
+        """Creates required tables if they don't exist."""
+        connection = duckdb.connect(self.db_path)
+        try:
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS SLEEP_EPOCHS (
+                    SUBJECT_ID INTEGER,
+                    EPOCH_IDX INTEGER,
+                    STAGE VARCHAR,
+                    DELTA_POWER DOUBLE,
+                    THETA_POWER DOUBLE,
+                    ALPHA_POWER DOUBLE,
+                    SIGMA_POWER DOUBLE,
+                    BETA_POWER DOUBLE,
+                    LOAD_TIMESTAMP TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            connection.execute("""
+                CREATE TABLE IF NOT EXISTS INGESTION_ERRORS (
+                    ERROR_ID UUID DEFAULT uuid(),
+                    SUBJECT_ID INTEGER,
+                    ERROR_TYPE VARCHAR,
+                    ERROR_MESSAGE VARCHAR,
+                    STACK_TRACE VARCHAR,
+                    OCCURRED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+        finally:
+            connection.close()
+
     def load_epochs(self, df: pd.DataFrame, subject_id: int) -> None:
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table.
