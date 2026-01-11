@@ -14,6 +14,7 @@ from ingest_data import (
     STUDY,
 )
 from warehouse.factory import get_warehouse_client
+from warehouse.base import WarehouseClient
 from validators import SleepSchema
 
 
