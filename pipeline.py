@@ -14,7 +14,7 @@ from ingest_data import (
     RECORDING,
     STARTING_SUBJECT,
     STUDY,
-    fetch_data,
+    fetch_data
 )
 from validators import SleepSchema
 from warehouse.base import WarehouseClient
@@ -50,21 +50,20 @@ def extract_to_parquet(subject_id: int) -> dict:
             subject_id=subject_id,
             psg_path=psg_path,
             hypno_path=hypno_path,
-            batch_size=100,  # Process 3000 seconds of audio at a time
+            batch_size=100
         )
 
         total_batches = 0
 
-        # CONSUME GENERATOR
+        # Consume generator
         for i, df_batch in enumerate(record_generator):
             if df_batch.empty:
                 continue
 
-            # Validate immediately (Fail Fast)
-            # We validate here so we don't save bad data to disk
+            # Validate here so we don't save bad data to disk
             validated_df = SleepSchema.validate(df_batch, lazy=True)
 
-            # Write to Parquet (Snappy compression is default and good)
+            # Write to Parquet
             # Format: part_0.parquet, part_1.parquet
             file_path = staging_dir / f"part_{i}.parquet"
             validated_df.to_parquet(file_path, index=False)
@@ -141,15 +140,14 @@ def run_ingestion_pipeline():
 
     subject_ids = list(range(STARTING_SUBJECT, ENDING_SUBJECT + 1))
 
-    # 1. Download Data
+    # Download data
     logger.info("Ensuring data is available...")
     fetch_data(subjects=subject_ids, recording=[RECORDING])
 
-    # 2. Extract & Validate (Parallel) -> Writes to Disk
-    # This returns a list of result dicts
+    # Extract & validate (parallel) -> writes to disk
     extraction_results = extract_to_parquet.map(subject_ids)
 
-    # 3. Load to Warehouse (Serial) -> Reads from Disk
+    # Load to warehouse (serial) -> reads from disk
     for subject_id, result_future in zip(subject_ids, extraction_results):
         try:
             result = result_future.result()

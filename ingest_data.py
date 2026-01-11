@@ -25,8 +25,8 @@ def fetch_data(subjects, recording):
     Fetches raw Sleep-EDF data files from PhysioNet.
 
     Args:
-        subjects (list[int]): Which subjects to download (e.g., [1, 2]).
-        recording (list[int]): Which recording session to grab (1 is the baseline, 2 is often the fallout).
+        subjects (list[int]): Which subjects to download (ex. [1, 2]).
+        recording (list[int]): Which recording session to grab (1 is the default, 2 is often the fallout).
 
     Returns:
         list[list[str]]: A list of [psg_path, hypnogram_path] pairs for each subject.
