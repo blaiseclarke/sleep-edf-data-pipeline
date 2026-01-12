@@ -4,11 +4,11 @@ __pycache__/
 .ruff_cache/
 .DS_Store
 
-# Virtual Environment
+# Virtual environment
 venv/
 .venv/
 
-# Environment and Data
+# Environment and data
 .env
 data/
 *.edf
@@ -16,7 +16,11 @@ data/
 *.db
 *.log
 
-# dbt Artifacts
+# dbt artifacts
 target/
 dbt_packages/
 logs/
+
+# Profiling
+*.bin
+*.html

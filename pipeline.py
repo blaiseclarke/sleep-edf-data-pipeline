@@ -1,6 +1,5 @@
 from pathlib import Path
 from prefect import task, flow, get_run_logger
-from prefect.task_runners import ConcurrentTaskRunner
 from pandera.errors import SchemaErrors
 
 import pandas as pd
@@ -36,15 +35,15 @@ def extract_to_parquet(subject_id: int) -> dict:
         shutil.rmtree(staging_dir)  # Clean start
     staging_dir.mkdir(parents=True, exist_ok=True)
 
+    # Fetch calls (should trigger retry if they fail)
+    filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
+    if not filepaths:
+        return {"subject_id": subject_id, "path": None, "error": "No files found"}
+
+    psg_path, hypno_path = filepaths[0]
+
     try:
-        # Get the paths
-        filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
-        if not filepaths:
-            return {"subject_id": subject_id, "path": None, "error": "No files found"}
-
-        psg_path, hypno_path = filepaths[0]
-
-        # Initialize generator
+        # Processing logic
         record_generator = batch_process_file(
             subject_id=subject_id,
             psg_path=psg_path,
@@ -59,7 +58,7 @@ def extract_to_parquet(subject_id: int) -> dict:
             if df_batch.empty:
                 continue
 
-            # Validate here so we don't save bad data to disk
+            # Validate here so no bad data is saved to disk
             validated_df = SleepSchema.validate(df_batch, lazy=True)
 
             # Write to Parquet
@@ -78,22 +77,12 @@ def extract_to_parquet(subject_id: int) -> dict:
         return {"subject_id": subject_id, "path": str(staging_dir), "error": None}
 
     except SchemaErrors as e:
+        # Catch data quality errors
         logger.error(f"Validation failed for subject {subject_id}: {e}")
         return {
             "subject_id": subject_id,
             "path": None,
             "error": {"type": "SchemaError", "message": str(e)},
-        }
-    except Exception as e:
-        logger.error(f"Extraction failed for subject {subject_id}: {e}")
-        return {
-            "subject_id": subject_id,
-            "path": None,
-            "error": {
-                "type": type(e).__name__,
-                "message": str(e),
-                "stack_trace": traceback.format_exc(),
-            },
         }
 
 
@@ -122,7 +111,7 @@ def load_parquet_to_warehouse(
         # Ensure uppercase for Snowflake compatibility
         df.columns = [c.upper() for c in df.columns]
         
-        # Only overwrite on the first batch, append (retain) for subsequent batches
+        # Only overwrite on the first batch, append for subsequent batches
         overwrite = (i == 0)
         client.load_epochs(df, subject_id, overwrite=overwrite)
 
@@ -166,6 +155,7 @@ def run_ingestion_pipeline():
             logger.error(f"Pipeline loop failed for subject {subject_id}: {e}")
 
     logger.info("Pipeline finished!")
+
 
 
 if __name__ == "__main__":

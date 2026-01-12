@@ -72,8 +72,8 @@ def process_subject(subject_id):
     """
     filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
     if not filepaths:
-        # Sometimes Recording 1 is corrupt or missing. Fallback to Recording 2
-        # to ensure *some* data is retrieved for this subject, rather than failing entirely
+        # Sometimes recording 1 is corrupt or missing. Fallback to recording 2
+        # to ensure some data is retrieved for this subject, rather than failing entirely
         logger.warning(
             f"Subject {subject_id} missing recording {RECORDING}. Attempting fallback to recording {RECORDING + 1}."
         )
@@ -209,8 +209,8 @@ def calculate_band_power(psd, frequencies, fmin, fmax):
     band_power_db = 10 * np.log10(band_power)
 
     # Average the power across all selected EEG channels (Fpz-Cz and Pz-Oz)
-    # In a more complex study, Frontal and Occipital might be analyzed separately,
-    # but for this portfolio summary, a global average is sufficient
+    # In a more complex study, frontal and occipital might be analyzed separately,
+    # but for this, a global average is sufficient
     return band_power_db.mean(axis=1)
 
 

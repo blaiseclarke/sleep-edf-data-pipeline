@@ -9,21 +9,21 @@ with
             sum(case when sleep_stage != 'W' then 1 else 0 end)
             * 0.5 as total_sleep_minutes,
 
-            -- how many times the subject transitioned to wake
+            -- How many times the subject transitioned to wake
             sum(
                 case
                     when is_stage_transition = true and sleep_stage = 'W' then 1 else 0
                 end
             ) as number_of_awakenings,
 
-            -- deep sleep minutes and percentage
+            -- Deep sleep minutes and percentage
             sum(case when sleep_stage = 'N3' then 1 else 0 end)
             * 0.5 as deep_sleep_minutes,
             (sum(case when sleep_stage = 'N3' then 1 else 0 end) * 0.5) / nullif(
                 (sum(case when sleep_stage != 'W' then 1 else 0 end) * 0.5), 0
             ) as deep_sleep_percentage,
 
-            -- light sleep minutes and percentage
+            -- Light sleep minutes and percentage
             sum(case when sleep_stage in ('N1', 'N2') then 1 else 0 end)
             * 0.5 as light_sleep_minutes,
             (
@@ -39,7 +39,7 @@ with
                 (sum(case when sleep_stage != 'W' then 1 else 0 end) * 0.5), 0
             ) as rem_sleep_percentage,
 
-            -- power metrics
+            -- Power metrics
             avg(delta_moving_avg) as avg_delta_power,
             avg(sigma_moving_avg) as avg_sigma_power,
             avg(beta_moving_avg) as avg_beta_power,

@@ -8,8 +8,8 @@ from prefect import flow
 @flow
 def test_error_logging_flow():
     warehouse_client = DuckDBClient(db_path=DB_PATH)
-    # Simulate a failure by trying to process a subject that definitely doesn't exist (999).
-    # This forces the pipeline to generate an error, so we can verify our logging system catches it.
+    # Simulate a failure by trying to process a subject that doesn't exist (999)
+    # This forces the pipeline to generate an error, to verify the logging system catches it
     result = extract_subject_data(subject_id=999)
 
     if result["error"]:

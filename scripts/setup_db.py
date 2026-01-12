@@ -23,7 +23,7 @@ def setup_database():
 
     try:
         # Creates SLEEP_EPOCHS table
-        # Main fact table storing calculated power spectral density
+        # Main table storing calculated power spectral density
         # and sleep stages for every 30-second epoch
         connection.execute(
             """

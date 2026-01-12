@@ -33,7 +33,7 @@ def load_analysis_data(subject_id):
     """
     con = duckdb.connect(DB_PATH, read_only=True)
     
-    # 1. Get high-level summary
+    # Get high-level summary
     summary_query = """
         SELECT * 
         FROM sleep_summary 
@@ -41,7 +41,7 @@ def load_analysis_data(subject_id):
     """
     summary_df = con.execute(summary_query, [subject_id]).df()
     
-    # 2. Get epoch data
+    # Get epoch data
     epoch_query = """
         SELECT 
             epoch_idx, 
@@ -137,7 +137,6 @@ with c_left:
     
     df_power = pd.DataFrame(list(power_data.items()), columns=["Band", "dB"])
     
-    # Simple grey bars
     fig_bar = px.bar(
         df_power, 
         x='Band', 

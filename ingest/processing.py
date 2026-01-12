@@ -25,10 +25,10 @@ def batch_process_file(
     and yields small DataFrames. Memory usage remains constant.
     """
 
-    # lazy loading EDF
+    # Lazy loading EDF
     raw = mne.io.read_raw_edf(psg_path, preload=False, verbose=None)
 
-    # standardize channels
+    # Standardize channels
     mapping = {
         "EEG Fpz-Cz": "EEG",
         "EEG Pz-Oz": "EEG2",
@@ -38,7 +38,7 @@ def batch_process_file(
     actual_map = {k: v for k, v in mapping.items() if k in raw.ch_names}
     raw.rename_channels(actual_map)
 
-    # load annotations
+    # Load annotations
     annotations = mne.read_annotations(hypno_path)
     raw.set_annotations(annotations, emit_warning=False)
 
@@ -46,7 +46,7 @@ def batch_process_file(
         raw, chunk_duration=30.0, verbose=False
     )
 
-    # lazy epochs
+    # Lazy epochs
     epochs = mne.Epochs(
         raw=raw,
         events=events,
@@ -61,15 +61,15 @@ def batch_process_file(
 
     total_epochs = len(events)
 
-    # generator loop
+    # Generator loop
     for start_idx in range(0, total_epochs, batch_size):
         end_idx = min(start_idx + batch_size, total_epochs)
 
-        # load batch
+        # Load batch
         batch_epochs = epochs[start_idx:end_idx]
         batch_epochs.load_data()
 
-        # transform
+        # Transform
         # MNE stub bug: fmin/fmax are floats, but stubs sometimes demand int
         spectrum = batch_epochs.compute_psd(
             method="welch",
@@ -79,7 +79,7 @@ def batch_process_file(
         )
         psd, freqs = spectrum.get_data(return_freqs=True)
 
-        # format
+        # Format
         df_batch = _features_to_dataframe(
             psd=psd,
             freqs=freqs,
@@ -104,11 +104,11 @@ def _features_to_dataframe(
     df = pd.DataFrame()
     batch_length = len(epochs)
 
-    # ensure epoch_idx is continuous
+    # Ensure epoch_idx is continuous
     df["epoch_idx"] = range(start_index, start_index + batch_length)
     df["subject_id"] = subject_id
 
-    # extract labels
+    # Extract labels
     df["sleep_stage_label"] = epochs.events[:, 2]
 
     # Map integers back to strings
@@ -118,7 +118,7 @@ def _features_to_dataframe(
 
     df["stage"] = df["sleep_stage_label"].apply(lambda x: SLEEP_STAGE_MAP.get(x, "NAN"))
 
-    # power calculation
+    # Power calculation
     ch_names = epochs.info["ch_names"]
     df["delta_power"] = calculate_band_power(psd, freqs, ch_names, 0.5, 4)
     df["theta_power"] = calculate_band_power(psd, freqs, ch_names, 4, 8)
@@ -137,11 +137,11 @@ def _features_to_dataframe(
         "beta_power",
     ]
 
-    # drop epochs that are not valid sleep stages (ex. Movement time, Unscored)
-    # this ensures only W, N1, N2, N3, REM are passed to validation and downstream analysis
+    # Drop epochs that are not valid sleep stages (ex. Movement time, Unscored)
+    # This ensures only W, N1, N2, N3, REM are passed to validation and downstream analysis
     df = df[~df["stage"].isin(["MOVE", "NAN"])].copy()
 
-    # cast to silence Series/DataFrame ambiguity
+    # Cast to silence Series/DataFrame ambiguity
     return cast(pd.DataFrame, df[columns])
 
 
@@ -153,26 +153,26 @@ def calculate_band_power(
     fmax: float
 ) -> npt.NDArray[np.float64]:
     
-    # filter channels (EEG only)
-    # look for "EEG" in the name ("EEG Fpz-Cz", "EEG Pz-Oz")
+    # Filter channels (EEG only)
+    # Look for "EEG" in the name ("EEG Fpz-Cz", "EEG Pz-Oz")
     eeg_indices = [i for i, name in enumerate(ch_names) if "EEG" in name]
     
     if not eeg_indices:
-        # fallback: if no EEG found, take everything (prevent crash)
+        # Fallback: if no EEG found, take everything (prevent crash)
         eeg_indices = list(range(len(ch_names)))
 
-    # select only EEG channels from the PSD tensor
+    # Select only EEG channels from the PSD tensor
     # psd shape: (n_epochs, n_channels, n_freqs) -> (n_epochs, n_eeg, n_freqs)
     psd_eeg = psd[:, eeg_indices, :]
 
-    # select frequencies
+    # Select frequencies
     idx = np.logical_and(freqs >= fmin, freqs <= fmax)
     freq_res = freqs[1] - freqs[0]
 
-    # integrate (sum)
+    # Integrate (sum)
     band_power = psd_eeg[:, :, idx].sum(axis=2) * freq_res * 1e12
     band_power = np.maximum(band_power, 1e-10)
     band_power_db = 10 * np.log10(band_power)
 
-    # average across EEG channels only
+    # Average across EEG channels only
     return band_power_db.mean(axis=1)

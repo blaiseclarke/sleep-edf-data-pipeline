@@ -13,8 +13,8 @@ class SnowflakeClient(WarehouseClient):
     """
 
     def __init__(self):
-        # Relies on environment variables or external configuration for connection details.
-        # Keeps the initialization simple and secure.
+        # Relies on environment variables or external configuration for connection details
+        # Keeps the initialization simple and secure
         self.user = os.getenv("SNOWFLAKE_USER")
         self.password = os.getenv("SNOWFLAKE_PASSWORD")
         self.account = os.getenv("SNOWFLAKE_ACCOUNT")
@@ -55,7 +55,7 @@ class SnowflakeClient(WarehouseClient):
         """
         conn = self._get_connection()
         try:
-            # 1. Clears existing data for this subject (idempotency)
+            # Clears existing data for this subject (idempotency)
             # Prevents duplicate rows if the pipeline is re-run for a subject
             # Only runs if overwrite is True (default)
             if overwrite:
@@ -64,7 +64,7 @@ class SnowflakeClient(WarehouseClient):
                     "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = %s", (subject_id,)
                 )
 
-            # 2. Bulk loads new data
+            # Bulk loads new data
             # write_pandas is highly optimized; it transparently uploads the dataframe to a temporary stage
             # and performs a COPY INTO operation, which is much faster than INSERT statements
             if not df.empty:
