@@ -70,7 +70,7 @@ def batch_process_file(
         batch_epochs.load_data()
 
         # Transform
-        # MNE stub bug: fmin/fmax are floats, but stubs sometimes demand int
+        # MNE bug: fmin/fmax are floats, but stubs sometimes demand int
         spectrum = batch_epochs.compute_psd(
             method="welch",
             fmin=0.5,  # type: ignore
