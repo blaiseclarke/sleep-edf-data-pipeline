@@ -15,7 +15,7 @@ def integration_db(tmp_path, monkeypatch):
     db_file = str(tmp_path / "integration_sleep.db")
 
     # Patch the source of truth for DB_PATH
-    monkeypatch.setattr("ingest_data.DB_PATH", db_file)
+    monkeypatch.setattr("ingest.config.DB_PATH", db_file)
     monkeypatch.setattr("scripts.setup_db.DB_PATH", db_file)
 
     # Initialize the schema in the fresh database
@@ -29,7 +29,7 @@ def test_pipeline_parallel_ingestion_integration(integration_db, tmp_path):
     End-to-End test of the ingestion pipeline:
     Extraction (Mocked) -> Validation (Pandera) -> Load (DuckDB).
     """
-    # 1. Create a valid mock DataFrame
+    # Create a valid mock DataFrame
     mock_df = pd.DataFrame(
         {
             "subject_id": [1, 1],
@@ -43,7 +43,7 @@ def test_pipeline_parallel_ingestion_integration(integration_db, tmp_path):
         }
     )
 
-    # 2. Patch extract_to_parquet (the new generator-based task)
+    # Patch extract_to_parquet (the new generator-based task)
     with patch("pipeline.extract_to_parquet") as mock_extract:
         # Prepare staging area
         staging_dir = tmp_path / "staging_mock"
@@ -63,10 +63,10 @@ def test_pipeline_parallel_ingestion_integration(integration_db, tmp_path):
 
         # Control the flow to only process a single subject (ID 1)
         with patch("pipeline.STARTING_SUBJECT", 1), patch("pipeline.ENDING_SUBJECT", 1):
-            # 3. Execute the full Prefect flow
+            # Execute the full Prefect flow
             run_ingestion_pipeline()
 
-    # 4. Verify results in DuckDB
+    # Verify results in DuckDB
     connection = duckdb.connect(integration_db)
     result_df = connection.execute("SELECT * FROM SLEEP_EPOCHS ORDER BY EPOCH_IDX").df()
     connection.close()

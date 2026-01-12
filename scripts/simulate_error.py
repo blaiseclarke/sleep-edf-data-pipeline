@@ -1,7 +1,7 @@
 import duckdb
 from pipeline import extract_subject_data
 from warehouse.duckdb_client import DuckDBClient
-from ingest_data import DB_PATH
+from ingest.config import DB_PATH
 from prefect import flow
 
 

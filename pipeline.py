@@ -7,7 +7,7 @@ import shutil
 import traceback
 
 from ingest.processing import batch_process_file
-from ingest_data import (
+from ingest.config import (
     ENDING_SUBJECT,
     RECORDING,
     STARTING_SUBJECT,

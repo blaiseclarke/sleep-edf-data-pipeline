@@ -187,7 +187,7 @@ Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. T
 
 * **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands.
 * **Standardization:** Maps raw annotations to standardized clinical sleep stages: `W, N1, N2, N3, REM, MOVE, NAN`.
-* **Performance Optimization:** Utilizes `preload=True` to speed up FFT computations.
+* **Memory Efficiency:** Utilizes `preload=False` (memory mapping) to handle large EEG files with minimal RAM impact.
 * **Configurable Parameters:** The pipeline range and logic are controlled via environment variables:
     * `STARTING_SUBJECT` / `ENDING_SUBJECT`: Define the participant ID range (0-82 for age study, 0-21 for telemetry study).
     * `RECORDING`: Specifies which session recording to fetch (default: 1).

@@ -12,7 +12,7 @@ class DuckDBClient(WarehouseClient):
 
     def __init__(self, db_path: Optional[str] = None):
         if db_path is None:
-            from ingest_data import DB_PATH
+            from ingest.config import DB_PATH
 
             self.db_path = DB_PATH
         else:
@@ -83,7 +83,6 @@ class DuckDBClient(WarehouseClient):
 
             # Inserts new records using explicit column list
             # Leverages DuckDB's ability to query local pandas dataframes directly ('FROM df')
-            # for high-performance interactions causing minimal overhead
             query = f"""
                 INSERT INTO SLEEP_EPOCHS ({", ".join(columns)})
                 SELECT {", ".join(columns)}

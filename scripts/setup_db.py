@@ -2,7 +2,7 @@ import os
 import logging
 import duckdb
 
-from ingest_data import DB_PATH
+from ingest.config import DB_PATH
 
 
 logging.basicConfig(level=logging.INFO)
