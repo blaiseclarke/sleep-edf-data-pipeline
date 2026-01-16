@@ -2,7 +2,7 @@ import duckdb
 import os
 import pandas as pd
 
-DB_PATH = os.getenv("DB_PATH", "data/sleep_data.db")
+from ingest.config import DB_PATH
 
 def verify_db():
     if not os.path.exists(DB_PATH):
