@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 from mne.datasets.sleep_physionet.age import fetch_data as fetch_age_data
 from mne.datasets.sleep_physionet.temazepam import fetch_data as fetch_telemetry_data
 
@@ -12,6 +13,7 @@ ENDING_SUBJECT = int(os.getenv("ENDING_SUBJECT", 10))
 RECORDING = int(os.getenv("RECORDING", 1))
 EPOCH_LENGTH = float(os.getenv("EPOCH_LENGTH", 30.0))  # seconds
 DB_PATH = os.getenv("DB_PATH", "data/sleep_data.db")
+STAGING_DIR = Path(os.getenv("STAGING_DIR", "data/staging"))
 STUDY = os.getenv("STUDY", "age").lower()  # Options: age, telemetry
 
 # Shared mapping

@@ -169,12 +169,12 @@ python scripts/setup_db.py
 # 3. Run ingestion pipeline directly
 python pipeline.py
 
-# Transformations (Default to Snowflake if .env configured)
+# Transformations (Local DuckDB)
 dbt deps --profiles-dir .
-dbt run --profiles-dir .
-dbt test --profiles-dir .
+dbt run --profiles-dir . --target dev_duckdb
+dbt test --profiles-dir . --target dev_duckdb
 
-# Note: Use `--target dev_duckdb` to run against local storage.
+# Note: Valid targets are `dev_duckdb` (local) and `dev` (Snowflake).
 ```
 
 

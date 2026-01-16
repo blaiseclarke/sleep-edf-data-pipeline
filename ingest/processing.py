@@ -5,16 +5,7 @@ import mne
 import numpy as np
 import pandas as pd
 
-SLEEP_STAGE_MAP = {
-    "Sleep stage W": "W",
-    "Sleep stage 1": "N1",
-    "Sleep stage 2": "N2",
-    "Sleep stage 3": "N3",
-    "Sleep stage 4": "N3",
-    "Sleep stage R": "REM",
-    "Movement time": "MOVE",
-    "Sleep stage ?": "NAN",
-}
+from ingest.config import SLEEP_STAGE_MAP
 
 
 def batch_process_file(

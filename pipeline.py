@@ -11,6 +11,7 @@ from ingest.config import (
     ENDING_SUBJECT,
     RECORDING,
     STARTING_SUBJECT,
+    STAGING_DIR,
     STUDY,
     fetch_data
 )
@@ -30,7 +31,7 @@ def extract_to_parquet(subject_id: int) -> dict:
 
     # Create a staging directory for this subject
     # ex. data/staging/subject_1/
-    staging_dir = Path(f"data/staging/subject_{subject_id}")
+    staging_dir = STAGING_DIR / f"subject_{subject_id}"
     if staging_dir.exists():
         shutil.rmtree(staging_dir)  # Clean start
     staging_dir.mkdir(parents=True, exist_ok=True)
