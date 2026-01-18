@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+__pycache__/
+venv/
+data/
+*.pyc
+.DS_Store
+target/
+dbt_packages/
+logs/
+.pytest_cache/
+.ruff_cache/
