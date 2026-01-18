@@ -4,7 +4,6 @@ from pandera.errors import SchemaErrors
 
 import pandas as pd
 import shutil
-import traceback
 
 from ingest.processing import batch_process_file
 from ingest.config import (
@@ -12,7 +11,6 @@ from ingest.config import (
     RECORDING,
     STARTING_SUBJECT,
     STAGING_DIR,
-    STUDY,
     fetch_data
 )
 from validators import SleepSchema

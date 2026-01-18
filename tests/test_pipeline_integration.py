@@ -3,7 +3,6 @@ import pandas as pd
 import duckdb
 from unittest.mock import patch, MagicMock
 from pipeline import run_ingestion_pipeline
-from warehouse.duckdb_client import DuckDBClient
 from scripts.setup_db import setup_database
 
 

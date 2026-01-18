@@ -1,6 +1,5 @@
 import duckdb
 import os
-import pandas as pd
 
 from ingest.config import DB_PATH
 
