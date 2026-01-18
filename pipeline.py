@@ -11,7 +11,7 @@ from ingest.config import (
     RECORDING,
     STARTING_SUBJECT,
     STAGING_DIR,
-    fetch_data
+    fetch_data,
 )
 from validators import SleepSchema
 from warehouse.base import WarehouseClient
@@ -47,7 +47,7 @@ def extract_to_parquet(subject_id: int) -> dict:
             subject_id=subject_id,
             psg_path=psg_path,
             hypno_path=hypno_path,
-            batch_size=100
+            batch_size=100,
         )
 
         total_batches = 0
@@ -109,9 +109,9 @@ def load_parquet_to_warehouse(
         df = pd.read_parquet(p_file)
         # Ensure uppercase for Snowflake compatibility
         df.columns = [c.upper() for c in df.columns]
-        
+
         # Only overwrite on the first batch, append for subsequent batches
-        overwrite = (i == 0)
+        overwrite = i == 0
         client.load_epochs(df, subject_id, overwrite=overwrite)
 
 
@@ -154,7 +154,6 @@ def run_ingestion_pipeline():
             logger.error(f"Pipeline loop failed for subject {subject_id}: {e}")
 
     logger.info("Pipeline finished!")
-
 
 
 if __name__ == "__main__":

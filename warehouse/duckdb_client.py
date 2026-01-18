@@ -17,7 +17,7 @@ class DuckDBClient(WarehouseClient):
             self.db_path = DB_PATH
         else:
             self.db_path = db_path
-        
+
         # Ensure parent directory exists
         if self.db_path and os.path.dirname(self.db_path):
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
@@ -56,7 +56,9 @@ class DuckDBClient(WarehouseClient):
         finally:
             connection.close()
 
-    def load_epochs(self, df: pd.DataFrame, subject_id: int, overwrite: bool = True) -> None:
+    def load_epochs(
+        self, df: pd.DataFrame, subject_id: int, overwrite: bool = True
+    ) -> None:
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table.
         Clears existing data for the subject before inserting if overwrite=True.

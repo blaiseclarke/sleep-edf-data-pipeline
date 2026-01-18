@@ -91,7 +91,6 @@ def _features_to_dataframe(
     event_id: Dict[str, int],
     start_index: int,
 ) -> pd.DataFrame:
-
     df = pd.DataFrame()
     batch_length = len(epochs)
 
@@ -137,17 +136,16 @@ def _features_to_dataframe(
 
 
 def calculate_band_power(
-    psd: npt.NDArray[np.float64], 
-    freqs: npt.NDArray[np.float64], 
+    psd: npt.NDArray[np.float64],
+    freqs: npt.NDArray[np.float64],
     ch_names: List[str],
-    fmin: float, 
-    fmax: float
+    fmin: float,
+    fmax: float,
 ) -> npt.NDArray[np.float64]:
-    
     # Filter channels (EEG only)
     # Look for "EEG" in the name ("EEG Fpz-Cz", "EEG Pz-Oz")
     eeg_indices = [i for i, name in enumerate(ch_names) if "EEG" in name]
-    
+
     if not eeg_indices:
         # Fallback: if no EEG found, take everything (prevent crash)
         eeg_indices = list(range(len(ch_names)))

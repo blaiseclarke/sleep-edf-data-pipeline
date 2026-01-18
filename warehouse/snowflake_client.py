@@ -49,7 +49,9 @@ class SnowflakeClient(WarehouseClient):
             role=self.role,
         )
 
-    def load_epochs(self, df: pd.DataFrame, subject_id: int, overwrite: bool = True) -> None:
+    def load_epochs(
+        self, df: pd.DataFrame, subject_id: int, overwrite: bool = True
+    ) -> None:
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table in Snowflake.
         """
@@ -78,8 +80,10 @@ class SnowflakeClient(WarehouseClient):
                     schema=self.schema,
                 )
                 if not success:
-                    raise RuntimeError(f"Failed to write pandas DataFrame for subject {subject_id}")
-            
+                    raise RuntimeError(
+                        f"Failed to write pandas DataFrame for subject {subject_id}"
+                    )
+
         finally:
             conn.close()
 
