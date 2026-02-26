@@ -50,11 +50,13 @@ class SnowflakeClient(WarehouseClient):
         )
 
     def load_epochs(
-        self, df: pd.DataFrame, subject_id: int, overwrite: bool = True
+        self, staging_path: str, subject_id: int, overwrite: bool = True
     ) -> None:
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table in Snowflake.
         """
+        from pathlib import Path
+
         conn = self._get_connection()
         try:
             # Clears existing data for this subject (idempotency)
@@ -66,23 +68,31 @@ class SnowflakeClient(WarehouseClient):
                     "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = %s", (subject_id,)
                 )
 
+            path_obj = Path(staging_path)
+            if not path_obj.exists():
+                return
+
+            parquet_files = sorted(path_obj.glob("*.parquet"))
+
             # Bulk loads new data
             # write_pandas is highly optimized; it transparently uploads the dataframe to a temporary stage
             # and performs a COPY INTO operation, which is much faster than INSERT statements
-            if not df.empty:
-                # Snowflake expects uppercase column names by default
-                df.columns = [c.upper() for c in df.columns]
-                success, nchunks, nrows, _ = write_pandas(
-                    conn,
-                    df,
-                    "SLEEP_EPOCHS",
-                    database=self.database,
-                    schema=self.schema,
-                )
-                if not success:
-                    raise RuntimeError(
-                        f"Failed to write pandas DataFrame for subject {subject_id}"
+            for p_file in parquet_files:
+                df = pd.read_parquet(p_file)
+                if not df.empty:
+                    # Snowflake expects uppercase column names by default
+                    df.columns = [c.upper() for c in df.columns]
+                    success, nchunks, nrows, _ = write_pandas(
+                        conn,
+                        df,
+                        "SLEEP_EPOCHS",
+                        database=self.database,
+                        schema=self.schema,
                     )
+                    if not success:
+                        raise RuntimeError(
+                            f"Failed to write pandas DataFrame for subject {subject_id} (file: {p_file})"
+                        )
 
         finally:
             conn.close()

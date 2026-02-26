@@ -1,6 +1,5 @@
 import os
 import duckdb
-import pandas as pd
 from typing import Optional
 from warehouse.base import WarehouseClient
 
@@ -57,11 +56,12 @@ class DuckDBClient(WarehouseClient):
             connection.close()
 
     def load_epochs(
-        self, df: pd.DataFrame, subject_id: int, overwrite: bool = True
+        self, staging_path: str, subject_id: int, overwrite: bool = True
     ) -> None:
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table.
         Clears existing data for the subject before inserting if overwrite=True.
+        Natively reads partitioned Parquet files from the staging directory.
         """
         connection = duckdb.connect(self.db_path)
         try:
@@ -83,12 +83,12 @@ class DuckDBClient(WarehouseClient):
                 "BETA_POWER",
             ]
 
-            # Inserts new records using explicit column list
-            # Leverages DuckDB's ability to query local pandas dataframes directly ('FROM df')
+            # Native Parquet loading
+            # Uses duckdb's read_parquet function directly on the staging path
             query = f"""
                 INSERT INTO SLEEP_EPOCHS ({", ".join(columns)})
                 SELECT {", ".join(columns)}
-                FROM df
+                FROM read_parquet('{staging_path}/*.parquet')
             """
             connection.execute(query)
         finally:

@@ -1,5 +1,4 @@
 from typing import Optional, Protocol
-import pandas as pd
 
 
 class WarehouseClient(Protocol):
@@ -10,9 +9,9 @@ class WarehouseClient(Protocol):
     """
 
     def load_epochs(
-        self, df: pd.DataFrame, subject_id: int, overwrite: bool = True
+        self, staging_path: str, subject_id: int, overwrite: bool = True
     ) -> None:
-        """Saves a batch of sleep data to the database."""
+        """Saves a batch of sleep data to the database from a Parquet directory."""
         ...
 
     def log_ingestion_error(
