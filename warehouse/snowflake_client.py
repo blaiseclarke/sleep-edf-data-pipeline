@@ -1,8 +1,6 @@
 import os
 from typing import Optional
-import pandas as pd
 import snowflake.connector
-from snowflake.connector.pandas_tools import write_pandas
 from warehouse.base import WarehouseClient
 
 
