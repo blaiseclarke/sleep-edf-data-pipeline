@@ -3,6 +3,7 @@ from prefect import task, flow, get_run_logger
 from pandera.errors import SchemaErrors
 
 import shutil
+import subprocess
 
 from ingest.processing import batch_process_file
 from ingest.config import (
@@ -104,6 +105,53 @@ def load_parquet_to_warehouse(
     client.load_epochs(staging_path, subject_id, overwrite=True)
 
 
+@task
+def run_dbt_transformations():
+    """
+    Executes the dbt models using the local CLI to transform the newly loaded data.
+    """
+    import os
+
+    logger = get_run_logger()
+
+    warehouse_type = os.getenv("WAREHOUSE_TYPE", "duckdb").lower()
+    target = "dev_duckdb" if warehouse_type == "duckdb" else "dev"
+
+    logger.info("Executing dbt deps to ensure packages are installed...")
+    deps_result = subprocess.run(
+        ["dbt", "deps", "--profiles-dir", "."], capture_output=True, text=True
+    )
+    if deps_result.returncode != 0:
+        logger.error(f"dbt deps failed:\n{deps_result.stdout}\n{deps_result.stderr}")
+        raise RuntimeError("dbt deps failed")
+    logger.info(deps_result.stdout)
+
+    logger.info(f"Executing dbt run against target: {target}...")
+
+    # Run transformations
+    run_result = subprocess.run(
+        ["dbt", "run", "--profiles-dir", ".", "--target", target],
+        capture_output=True,
+        text=True,
+    )
+    if run_result.returncode != 0:
+        logger.error(f"dbt run failed:\n{run_result.stdout}\n{run_result.stderr}")
+        raise RuntimeError("dbt run failed")
+    logger.info(run_result.stdout)
+
+    logger.info(f"Executing dbt test against target: {target}...")
+    # Run tests
+    test_result = subprocess.run(
+        ["dbt", "test", "--profiles-dir", ".", "--target", target],
+        capture_output=True,
+        text=True,
+    )
+    if test_result.returncode != 0:
+        logger.error(f"dbt test failed:\n{test_result.stdout}\n{test_result.stderr}")
+        raise RuntimeError("dbt test failed")
+    logger.info(test_result.stdout)
+
+
 @flow(name="Sleep-EDF Ingestion Pipeline")
 def run_ingestion_pipeline():
     logger = get_run_logger()
@@ -142,7 +190,12 @@ def run_ingestion_pipeline():
         except Exception as e:
             logger.error(f"Pipeline loop failed for subject {subject_id}: {e}")
 
-    logger.info("Pipeline finished!")
+    logger.info(
+        "Pipeline finished extracting and loading data. Starting transformations..."
+    )
+    run_dbt_transformations()
+
+    logger.info("Pipeline completely finished!")
 
 
 if __name__ == "__main__":
