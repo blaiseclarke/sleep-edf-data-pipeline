@@ -60,8 +60,6 @@ class SnowflakeClient(WarehouseClient):
         conn = self._get_connection()
         try:
             # Clears existing data for this subject (idempotency)
-            # Prevents duplicate rows if the pipeline is re-run for a subject
-            # Only runs if overwrite is True (default)
             if overwrite:
                 cursor = conn.cursor()
                 cursor.execute(
@@ -73,26 +71,36 @@ class SnowflakeClient(WarehouseClient):
                 return
 
             parquet_files = sorted(path_obj.glob("*.parquet"))
+            if not parquet_files:
+                return
 
-            # Bulk loads new data
-            # write_pandas is highly optimized; it transparently uploads the dataframe to a temporary stage
-            # and performs a COPY INTO operation, which is much faster than INSERT statements
-            for p_file in parquet_files:
-                df = pd.read_parquet(p_file)
-                if not df.empty:
-                    # Snowflake expects uppercase column names by default
-                    df.columns = [c.upper() for c in df.columns]
-                    success, nchunks, nrows, _ = write_pandas(
-                        conn,
-                        df,
-                        "SLEEP_EPOCHS",
-                        database=self.database,
-                        schema=self.schema,
-                    )
-                    if not success:
-                        raise RuntimeError(
-                            f"Failed to write pandas DataFrame for subject {subject_id} (file: {p_file})"
-                        )
+            cursor = conn.cursor()
+
+            # Create a temporary internal stage if it doesn't exist
+            stage_name = f"STAGE_SLEEP_EPOCHS_{subject_id}"
+            cursor.execute(f"CREATE TEMPORARY STAGE IF NOT EXISTS {stage_name}")
+
+            try:
+                # 1. PUT files into the internal stage
+                # Using auto_compress=False because parquet is already compressed
+                # Using Path.absolute() to ensure Snowflake CLI tool finds it correctly
+                put_command = f"PUT file://{path_obj.absolute()}/*.parquet @{stage_name} AUTO_COMPRESS=FALSE"
+                cursor.execute(put_command)
+
+                # 2. COPY INTO the target table
+                # We use MATCH_BY_COLUMN_NAME to map Parquet columns to Snowflake columns automatically
+                copy_command = f"""
+                    COPY INTO SLEEP_EPOCHS 
+                    FROM @{stage_name} 
+                    FILE_FORMAT = (TYPE = PARQUET) 
+                    MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
+                    PURGE = TRUE
+                """
+                cursor.execute(copy_command)
+
+            finally:
+                # 3. Clean up the stage
+                cursor.execute(f"DROP STAGE IF EXISTS {stage_name}")
 
         finally:
             conn.close()
