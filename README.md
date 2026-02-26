@@ -24,6 +24,7 @@ Explore sleep architecture and power ratios from the Sleep-EDF age study dataset
 **Features:**
 *   **Subject Viewer**: Inspect individual recordings (Hypnogram, spectral power).
 *   **Clinical Metrics**: Total sleep time, awakenings, and sleep stage percentages.
+*   **Continuous Uptime**: A custom GitHub Action explicitly bypasses Cloudflare bot protection to prevent the app from hibernating.
 
 ---
 
@@ -47,6 +48,8 @@ Explore sleep architecture and power ratios from the Sleep-EDF age study dataset
 * **Data Validation:** Uses `pandera` for schema-level validation of biosignal dataframes.
 * **Parallel Ingestion:** Processes subjects concurrently using Prefect's mapping execution.
 * **Hybrid Warehousing:** Writes to local DuckDB (dev) or Snowflake (prod) using a unified `WarehouseClient` protocol.
+* **Native Parquet Staging:** Leverages highly optimized `PUT` and `COPY INTO` commands for Snowflake, and `read_parquet` for DuckDB, completely bypassing Pandas memory overhead.
+* **Unified Orchestration:** Prefect universally orchestrates both Python ingestion logic and downstream `dbt` models for a seamless ELT pipeline.
 * **Upfront Fetching:** Pre-fetches MNE data to prevent filesystem locking during parallel extraction.
 * **Robust Observability:** Thread-safe error logging captures all extraction failures in the `INGESTION_ERRORS` table.
 * **Reproducibility:** Fully containerized with Docker; local development automated via Makefile.
@@ -118,13 +121,7 @@ cd sleep-edf-data-pipeline
 # 2. Build and run (uses .env automatically)
 docker compose up --build
 
-# 3. Transformations
-# Point dbt to the local profiles.yml
-dbt deps --profiles-dir .
-dbt run --profiles-dir .
-dbt test --profiles-dir .
-
-# Note: dbt transformations are executed after ingestion and connect to the configured warehouse (DuckDB or Snowflake).
+# Note: Prefect automatically kicks off `dbt deps`, `dbt run`, and `dbt test` against the target warehouse after successful ingestion!
 ```
 #### Option 2: Local Development (Makefile)
 
@@ -147,14 +144,10 @@ make setup-db
 # 5. Run, lint, and test
 make lint    # Check for errors
 make format  # Autoformat code
-make run     # Run parallel ingestion pipeline (persists to DuckDB)
+make run     # Run parallel ingestion and dbt ELT pipeline
 
 # 6. Test observability
 python simulate_error.py  # Verifies the error warehouse captures failures
-
-# 7. Transformations (local DuckDB)
-dbt run --profiles-dir . --target dev_duckdb
-dbt test --profiles-dir . --target dev_duckdb
 ```
 
 #### Option 3: Manual Python Execution
@@ -167,14 +160,7 @@ pip install -r requirements.txt
 python scripts/setup_db.py
 
 # 3. Run ingestion pipeline directly
-python pipeline.py
-
-# Transformations (Local DuckDB)
-dbt deps --profiles-dir .
-dbt run --profiles-dir . --target dev_duckdb
-dbt test --profiles-dir . --target dev_duckdb
-
-# Note: Valid targets are `dev_duckdb` (local) and `dev` (Snowflake).
+python pipeline.py # Also executes target-specific dbt models via subprocess
 ```
 
 
@@ -185,7 +171,7 @@ dbt test --profiles-dir . --target dev_duckdb
 #### 1. Extraction (Python/MNE)
 Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. This handles the heavy lifting of signal processing before data ever hits the warehouse.
 
-* **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands.
+* **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands. Accurately computes logarithmic decibel scaling after averaging raw power across EEG channels to prevent arithmetic dimension bugs.
 * **Standardization:** Maps raw annotations to standardized clinical sleep stages: `W, N1, N2, N3, REM, MOVE, NAN`.
 * **Memory Efficiency:** Utilizes `preload=False` (memory mapping) to handle large EEG files with minimal RAM impact.
 * **Configurable Parameters:** The pipeline range and logic are controlled via environment variables:
@@ -198,8 +184,8 @@ Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. T
 
 #### 2. Warehousing (DuckDB / Snowflake)
 The pipeline is warehouse-agnostic via the `WarehouseClient` protocol.
-* **DuckDB (Local):** Default for local development. Data is persisted to `data/sleep_data.db` without cloud overhead.
-* **Snowflake (Cloud):** Used for production-scale storage and analytics, separating compute from storage. This allows the pipeline to scale without refactoring local memory constraints or ingestion logic.
+* **DuckDB (Local):** Default for local development. Data is persisted to `data/sleep_data.db` without cloud overhead. Uses native `read_parquet` scanning for zero-copy staging.
+* **Snowflake (Cloud):** Used for production-scale storage and analytics, separating compute from storage. Built with Snowflake's native internal stages and `COPY INTO`, ensuring zero out-of-memory crashes for massive Parquet bulk workloads.
 
 #### 3. Transformation (dbt)
 The dbt project creates a trusted data lineage, transforming raw logs into analytics-ready models:
