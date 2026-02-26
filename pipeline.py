@@ -2,7 +2,6 @@ from pathlib import Path
 from prefect import task, flow, get_run_logger
 from pandera.errors import SchemaErrors
 
-import pandas as pd
 import shutil
 
 from ingest.processing import batch_process_file
@@ -90,7 +89,7 @@ def load_parquet_to_warehouse(
     client: WarehouseClient, staging_path: str, subject_id: int
 ):
     """
-    Reads partitioned Parquet files and loads them to the warehouse.
+    Hands the staging directory to the warehouse client to be natively loaded.
     """
     logger = get_run_logger()
     path_obj = Path(staging_path)
@@ -99,20 +98,10 @@ def load_parquet_to_warehouse(
         logger.warning(f"Staging path {staging_path} does not exist.")
         return
 
-    # Gather all partition files
-    parquet_files = sorted(path_obj.glob("*.parquet"))
+    logger.info(f"Loading data from {staging_path} for subject {subject_id}...")
 
-    logger.info(f"Loading {len(parquet_files)} batches for subject {subject_id}...")
-
-    # Load file by file
-    for i, p_file in enumerate(parquet_files):
-        df = pd.read_parquet(p_file)
-        # Ensure uppercase for Snowflake compatibility
-        df.columns = [c.upper() for c in df.columns]
-
-        # Only overwrite on the first batch, append for subsequent batches
-        overwrite = i == 0
-        client.load_epochs(df, subject_id, overwrite=overwrite)
+    # Load data directly using the staging path footprint
+    client.load_epochs(staging_path, subject_id, overwrite=True)
 
 
 @flow(name="Sleep-EDF Ingestion Pipeline")
