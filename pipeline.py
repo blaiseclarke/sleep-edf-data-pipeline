@@ -111,6 +111,7 @@ def run_dbt_transformations():
     Executes the dbt models using the local CLI to transform the newly loaded data.
     """
     import os
+
     logger = get_run_logger()
 
     warehouse_type = os.getenv("WAREHOUSE_TYPE", "duckdb").lower()
@@ -119,7 +120,9 @@ def run_dbt_transformations():
 
     # Run transformations
     run_result = subprocess.run(
-        ["dbt", "run", "--profiles-dir", ".", "--target", target], capture_output=True, text=True
+        ["dbt", "run", "--profiles-dir", ".", "--target", target],
+        capture_output=True,
+        text=True,
     )
     if run_result.returncode != 0:
         logger.error(f"dbt run failed:\n{run_result.stdout}\n{run_result.stderr}")
@@ -129,7 +132,9 @@ def run_dbt_transformations():
     logger.info(f"Executing dbt test against target: {target}...")
     # Run tests
     test_result = subprocess.run(
-        ["dbt", "test", "--profiles-dir", ".", "--target", target], capture_output=True, text=True
+        ["dbt", "test", "--profiles-dir", ".", "--target", target],
+        capture_output=True,
+        text=True,
     )
     if test_result.returncode != 0:
         logger.error(f"dbt test failed:\n{test_result.stdout}\n{test_result.stderr}")
