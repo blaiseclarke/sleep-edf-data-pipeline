@@ -161,7 +161,9 @@ def calculate_band_power(
     # Integrate (sum)
     band_power = psd_eeg[:, :, idx].sum(axis=2) * freq_res * 1e12
     band_power = np.maximum(band_power, 1e-10)
-    band_power_db = 10 * np.log10(band_power)
 
-    # Average across EEG channels only
-    return band_power_db.mean(axis=1)
+    # Average absolute power across EEG channels FIRST
+    avg_power = band_power.mean(axis=1)
+
+    # Convert the averaged power to decibels
+    return 10 * np.log10(avg_power)
