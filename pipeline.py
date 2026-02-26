@@ -116,6 +116,16 @@ def run_dbt_transformations():
 
     warehouse_type = os.getenv("WAREHOUSE_TYPE", "duckdb").lower()
     target = "dev_duckdb" if warehouse_type == "duckdb" else "dev"
+
+    logger.info("Executing dbt deps to ensure packages are installed...")
+    deps_result = subprocess.run(
+        ["dbt", "deps", "--profiles-dir", "."], capture_output=True, text=True
+    )
+    if deps_result.returncode != 0:
+        logger.error(f"dbt deps failed:\n{deps_result.stdout}\n{deps_result.stderr}")
+        raise RuntimeError("dbt deps failed")
+    logger.info(deps_result.stdout)
+
     logger.info(f"Executing dbt run against target: {target}...")
 
     # Run transformations
