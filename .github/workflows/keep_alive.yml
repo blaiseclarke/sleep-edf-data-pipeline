@@ -22,7 +22,7 @@ jobs:
           cat Assets/timestamp.txt
 
       - name: Ping App
-        run: curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -A "KeepAliveAction" -s -L https://sleepedf-demo.streamlit.app/ > /dev/null
+        run: curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -A "KeepAliveAction" -s -L -c cookies.txt -b cookies.txt https://sleepedf-demo.streamlit.app/ > /dev/null
 
       - name: Commit and push changes
         uses: EndBug/add-and-commit@v9
