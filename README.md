@@ -170,12 +170,11 @@ python pipeline.py # Also executes target-specific dbt models
 Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. This handles the heavy lifting of signal processing before data ever hits the warehouse.
 
 * **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands. 
-* **Standardization:** Maps raw annotations to standardized clinical sleep stages: `W, N1, N2, N3, REM, MOVE, NAN`.
+* **Standardization:** Maps raw annotations to clinical sleep stages (`W, N1, N2, N3, REM`). Movement and unscored epochs (`MOVE`, `NAN`) are filtered out before validation.
 * **Memory Efficiency:** Utilizes `preload=False` (memory mapping) to handle large EEG files with minimal RAM impact.
 * **Configurable Parameters:** The pipeline range and logic are controlled via environment variables:
     * `STARTING_SUBJECT` / `ENDING_SUBJECT`: Define the participant ID range (0-82 for age study, 0-21 for telemetry study).
     * `RECORDING`: Specifies which session recording to fetch (default: 1).
-    * `EPOCH_LENGTH`: Sets the window duration for EEG segmentation (default: 30s).
     * `DB_PATH`: Local path for the DuckDB database (default: `data/sleep_data.db`).
     * `PREFECT_MAX_WORKERS`: Limit on concurrent subject processing (default: 3).
     * `STUDY`: Selects the Sleep-EDF study (options: `age`, `telemetry`, default: `age`).
