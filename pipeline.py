@@ -1,4 +1,3 @@
-from pathlib import Path
 from prefect import task, flow, get_run_logger
 from pandera.errors import SchemaErrors
 
@@ -93,15 +92,10 @@ def load_parquet_to_warehouse(
     Hands the staging directory to the warehouse client to be natively loaded.
     """
     logger = get_run_logger()
-    path_obj = Path(staging_path)
-
-    if not path_obj.exists():
-        logger.warning(f"Staging path {staging_path} does not exist.")
-        return
-
     logger.info(f"Loading data from {staging_path} for subject {subject_id}...")
 
     # Load data directly using the staging path footprint
+    # The warehouse client validates path existence and raises FileNotFoundError if missing
     client.load_epochs(staging_path, subject_id, overwrite=True)
 
 
@@ -155,6 +149,13 @@ def run_dbt_transformations():
 @flow(name="Sleep-EDF Ingestion Pipeline")
 def run_ingestion_pipeline():
     logger = get_run_logger()
+
+    if STARTING_SUBJECT > ENDING_SUBJECT:
+        raise ValueError(
+            f"STARTING_SUBJECT ({STARTING_SUBJECT}) must be <= "
+            f"ENDING_SUBJECT ({ENDING_SUBJECT})"
+        )
+
     warehouse_client = get_warehouse_client()
 
     subject_ids = list(range(STARTING_SUBJECT, ENDING_SUBJECT + 1))
@@ -167,6 +168,7 @@ def run_ingestion_pipeline():
     extraction_results = extract_to_parquet.map(subject_ids)
 
     # Load to warehouse (serial) -> reads from disk
+    failed_subjects = []
     for subject_id, result_future in zip(subject_ids, extraction_results):
         try:
             result = result_future.result()
@@ -181,14 +183,26 @@ def run_ingestion_pipeline():
                     error_type="ExtractionFailed",
                     error_message=msg,
                 )
+                failed_subjects.append(subject_id)
                 continue
 
             staging_path = result["path"]
             if staging_path:
                 load_parquet_to_warehouse(warehouse_client, staging_path, subject_id)
 
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except Exception as e:
             logger.error(f"Pipeline loop failed for subject {subject_id}: {e}")
+            failed_subjects.append(subject_id)
+
+    if failed_subjects:
+        logger.warning(
+            f"{len(failed_subjects)}/{len(subject_ids)} subjects failed: {failed_subjects}"
+        )
+
+    if len(failed_subjects) == len(subject_ids):
+        raise RuntimeError("All subjects failed — skipping dbt transformations.")
 
     logger.info(
         "Pipeline finished extracting and loading data. Starting transformations..."

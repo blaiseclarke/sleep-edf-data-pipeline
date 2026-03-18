@@ -49,6 +49,10 @@ with
             case
                 when
                     lag(sleep_stage) over (partition by subject_id order by epoch_idx)
+                    is null
+                then false
+                when
+                    lag(sleep_stage) over (partition by subject_id order by epoch_idx)
                     != sleep_stage
                 then true
                 else false

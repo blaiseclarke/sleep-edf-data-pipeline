@@ -53,7 +53,22 @@ class SnowflakeClient(WarehouseClient):
         """
         Loads subject-level sleep epoch data into the SLEEP_EPOCHS table in Snowflake.
         """
+        import re
         from pathlib import Path
+
+        # Validate inputs before opening a connection or touching data
+        path_obj = Path(staging_path).resolve()
+        if not path_obj.is_dir():
+            raise FileNotFoundError(f"Staging path does not exist: {staging_path}")
+
+        parquet_files = sorted(path_obj.glob("*.parquet"))
+        if not parquet_files:
+            raise FileNotFoundError(
+                f"No parquet files found in: {staging_path}"
+            )
+
+        if not isinstance(subject_id, int) or subject_id < 0:
+            raise ValueError(f"Invalid subject_id: {subject_id}")
 
         conn = self._get_connection()
         try:
@@ -64,33 +79,28 @@ class SnowflakeClient(WarehouseClient):
                     "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = %s", (subject_id,)
                 )
 
-            path_obj = Path(staging_path)
-            if not path_obj.exists():
-                return
-
-            parquet_files = sorted(path_obj.glob("*.parquet"))
-            if not parquet_files:
-                return
-
             cursor = conn.cursor()
 
-            # Create a temporary internal stage if it doesn't exist
+            # Create a temporary internal stage with validated identifier
             stage_name = f"STAGE_SLEEP_EPOCHS_{subject_id}"
+            if not re.match(r"^[A-Z_][A-Z0-9_]*$", stage_name):
+                raise ValueError(f"Invalid stage name: {stage_name}")
             cursor.execute(f"CREATE TEMPORARY STAGE IF NOT EXISTS {stage_name}")
 
             try:
                 # 1. PUT files into the internal stage
                 # Using auto_compress=False because parquet is already compressed
-                # Using Path.absolute() to ensure Snowflake CLI tool finds it correctly
-                put_command = f"PUT file://{path_obj.absolute()}/*.parquet @{stage_name} AUTO_COMPRESS=FALSE"
+                # Escape single quotes in path for safety
+                safe_path = str(path_obj.absolute()).replace("'", "")
+                put_command = f"PUT 'file://{safe_path}/*.parquet' @{stage_name} AUTO_COMPRESS=FALSE"
                 cursor.execute(put_command)
 
                 # 2. COPY INTO the target table
                 # We use MATCH_BY_COLUMN_NAME to map Parquet columns to Snowflake columns automatically
                 copy_command = f"""
-                    COPY INTO SLEEP_EPOCHS 
-                    FROM @{stage_name} 
-                    FILE_FORMAT = (TYPE = PARQUET) 
+                    COPY INTO SLEEP_EPOCHS
+                    FROM @{stage_name}
+                    FILE_FORMAT = (TYPE = PARQUET)
                     MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
                     PURGE = TRUE
                 """

@@ -1,4 +1,4 @@
-FROM python:3.10
+FROM python:3.12
 
 # Create a non-root user
 RUN useradd -m -u 1000 appuser
@@ -19,6 +19,5 @@ USER appuser
 
 ENV PREFECT_LOGGING_LEVEL="INFO"
 
-# Run pipeline once container launches
-CMD ["python", "pipeline.py"]
-
+# Run pipeline once container launches with unbuffered output
+CMD ["python", "-u", "pipeline.py"]

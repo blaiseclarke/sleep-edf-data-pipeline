@@ -63,6 +63,16 @@ class DuckDBClient(WarehouseClient):
         Clears existing data for the subject before inserting if overwrite=True.
         Natively reads partitioned Parquet files from the staging directory.
         """
+        from pathlib import Path
+
+        path_obj = Path(staging_path).resolve()
+        if not path_obj.is_dir():
+            raise FileNotFoundError(f"Staging path does not exist: {staging_path}")
+
+        parquet_files = list(path_obj.glob("*.parquet"))
+        if not parquet_files:
+            raise FileNotFoundError(f"No parquet files found in: {staging_path}")
+
         connection = duckdb.connect(self.db_path)
         try:
             # Deletes existing records for subject
@@ -83,12 +93,12 @@ class DuckDBClient(WarehouseClient):
                 "BETA_POWER",
             ]
 
-            # Native Parquet loading
-            # Uses duckdb's read_parquet function directly on the staging path
+            # Native Parquet loading using parameterized glob pattern
+            safe_path = str(path_obj / "*.parquet").replace("'", "''")
             query = f"""
                 INSERT INTO SLEEP_EPOCHS ({", ".join(columns)})
                 SELECT {", ".join(columns)}
-                FROM read_parquet('{staging_path}/*.parquet')
+                FROM read_parquet('{safe_path}')
             """
             connection.execute(query)
         finally:

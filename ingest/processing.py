@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, Generator, List, cast
 import numpy.typing as npt
 
@@ -6,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from ingest.config import SLEEP_STAGE_MAP
+
+logger = logging.getLogger(__name__)
 
 
 def batch_process_file(
@@ -129,7 +132,17 @@ def _features_to_dataframe(
 
     # Drop epochs that are not valid sleep stages (ex. Movement time, Unscored)
     # This ensures only W, N1, N2, N3, REM are passed to validation and downstream analysis
+    initial_count = len(df)
     df = df[~df["stage"].isin(["MOVE", "NAN"])].copy()
+    dropped = initial_count - len(df)
+    if dropped > 0:
+        logger.info(
+            "Subject %d: dropped %d/%d invalid epochs (%.1f%%)",
+            subject_id,
+            dropped,
+            initial_count,
+            100 * dropped / initial_count,
+        )
 
     # Cast to silence Series/DataFrame ambiguity
     return cast(pd.DataFrame, df[columns])
@@ -164,6 +177,7 @@ def calculate_band_power(
 
     # Average absolute power across EEG channels FIRST
     avg_power = band_power.mean(axis=1)
+    avg_power = np.maximum(avg_power, 1e-10)
 
     # Convert the averaged power to decibels
     return 10 * np.log10(avg_power)
