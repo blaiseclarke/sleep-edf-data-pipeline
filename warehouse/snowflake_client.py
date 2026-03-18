@@ -63,9 +63,7 @@ class SnowflakeClient(WarehouseClient):
 
         parquet_files = sorted(path_obj.glob("*.parquet"))
         if not parquet_files:
-            raise FileNotFoundError(
-                f"No parquet files found in: {staging_path}"
-            )
+            raise FileNotFoundError(f"No parquet files found in: {staging_path}")
 
         if not isinstance(subject_id, int) or subject_id < 0:
             raise ValueError(f"Invalid subject_id: {subject_id}")
