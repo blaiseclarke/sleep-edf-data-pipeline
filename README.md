@@ -1,6 +1,6 @@
 # Containerized Biosignal ELT Pipeline (Sleep-EDF)
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-OLAP-FFF000?logo=duckdb&logoColor=black)
 ![Pandera](https://img.shields.io/badge/Pandera-Validation-E94F37?logo=pandera&logoColor=white)
 ![Snowflake](https://img.shields.io/badge/Snowflake-Data_Warehouse-29B5E8?logo=snowflake&logoColor=white)
@@ -62,7 +62,7 @@ You can run the pipeline directly on your local machine using Python, or in a co
 Docker Compose is recommended for reproducible execution.
 
 #### Prerequisites
-- Python 3.10+ *(for host execution)*
+- Python 3.12+ *(for host execution)*
 - Docker *(Docker Desktop recommended)*
 - Snowflake account *(optional, DuckDB used by default for local)*
 - `make` *(for automation)*
@@ -83,6 +83,7 @@ DB_PATH=data/sleep_data.db
 # SNOWFLAKE_ACCOUNT=your_account
 # SNOWFLAKE_USER=your_user
 # SNOWFLAKE_PASSWORD=your_password
+# SNOWFLAKE_ROLE=your_role
 # SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 # SNOWFLAKE_DATABASE=EEG_ANALYTICS
 # SNOWFLAKE_SCHEMA=RAW
