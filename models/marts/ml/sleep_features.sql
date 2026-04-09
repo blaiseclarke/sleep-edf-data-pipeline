@@ -1,5 +1,8 @@
 with
-    metrics as (select * from {{ ref("sleep_metrics")}}),
+    metrics as (
+        select * from {{ ref("sleep_metrics")}}
+        where sleep_stage in ('W', 'N1', 'N2', 'N3', 'REM')
+    ),
 
     -- Calculate biomarker ratios
     power_ratios as (

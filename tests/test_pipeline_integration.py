@@ -61,7 +61,13 @@ def test_pipeline_parallel_ingestion_integration(integration_db, tmp_path):
         mock_extract.map.return_value = [mock_future]
 
         # Control the flow to only process a single subject (ID 1)
-        with patch("pipeline.STARTING_SUBJECT", 1), patch("pipeline.ENDING_SUBJECT", 1):
+        # Mock fetch_data and run_dbt_transformations to avoid real network calls and subprocess execution
+        with (
+            patch("pipeline.STARTING_SUBJECT", 1),
+            patch("pipeline.ENDING_SUBJECT", 1),
+            patch("pipeline.fetch_data", return_value=[]),
+            patch("pipeline.run_dbt_transformations"),
+        ):
             # Execute the full Prefect flow
             run_ingestion_pipeline()
 

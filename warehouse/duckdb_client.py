@@ -75,12 +75,6 @@ class DuckDBClient(WarehouseClient):
 
         connection = duckdb.connect(self.db_path)
         try:
-            # Deletes existing records for subject
-            if overwrite:
-                connection.execute(
-                    "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = ?", (subject_id,)
-                )
-
             # Defines explicit column mapping
             columns = [
                 "SUBJECT_ID",
@@ -100,7 +94,19 @@ class DuckDBClient(WarehouseClient):
                 SELECT {", ".join(columns)}
                 FROM read_parquet('{safe_path}')
             """
-            connection.execute(query)
+
+            # Wrap DELETE + INSERT in a transaction for atomicity
+            connection.begin()
+            try:
+                if overwrite:
+                    connection.execute(
+                        "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = ?", (subject_id,)
+                    )
+                connection.execute(query)
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
         finally:
             connection.close()
 

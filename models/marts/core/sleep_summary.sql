@@ -6,7 +6,7 @@ with
             subject_id,
 
             count(*) * ({{ var("epoch_length_seconds") }} / 60.0) as total_recording_minutes,
-            sum(case when sleep_stage != 'W' then 1 else 0 end)
+            sum(case when sleep_stage in ('N1', 'N2', 'N3', 'REM') then 1 else 0 end)
             * ({{ var("epoch_length_seconds") }} / 60.0) as total_sleep_minutes,
 
             -- How many times the subject transitioned to wake
@@ -20,7 +20,7 @@ with
             sum(case when sleep_stage = 'N3' then 1 else 0 end)
             * ({{ var("epoch_length_seconds") }} / 60.0) as deep_sleep_minutes,
             (sum(case when sleep_stage = 'N3' then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)) / nullif(
-                (sum(case when sleep_stage != 'W' then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)), 0
+                (sum(case when sleep_stage in ('N1', 'N2', 'N3', 'REM') then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)), 0
             ) as deep_sleep_percentage,
 
             -- Light sleep minutes and percentage
@@ -29,14 +29,14 @@ with
             (
                 sum(case when sleep_stage in ('N1', 'N2') then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)
             ) / nullif(
-                (sum(case when sleep_stage != 'W' then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)), 0
+                (sum(case when sleep_stage in ('N1', 'N2', 'N3', 'REM') then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)), 0
             ) as light_sleep_percentage,
 
             -- REM sleep minutes and percentage
             sum(case when sleep_stage = 'REM' then 1 else 0 end)
             * ({{ var("epoch_length_seconds") }} / 60.0) as rem_sleep_minutes,
             (sum(case when sleep_stage = 'REM' then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)) / nullif(
-                (sum(case when sleep_stage != 'W' then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)), 0
+                (sum(case when sleep_stage in ('N1', 'N2', 'N3', 'REM') then 1 else 0 end) * ({{ var("epoch_length_seconds") }} / 60.0)), 0
             ) as rem_sleep_percentage,
 
             -- Power metrics

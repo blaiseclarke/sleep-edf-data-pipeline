@@ -20,5 +20,7 @@ vars:
 models:
   sleep_analytics:
     +materialized: view
+    marts:
+      +materialized: table
 flags:
   require_generic_test_arguments_property: true

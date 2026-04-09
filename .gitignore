@@ -11,12 +11,11 @@ venv/
 # Environment and data
 .env
 data/*
-!data/sleep_data.db
 *.edf
 *.csv
 *.db
-!data/sleep_data.db
 *.log
+.user.yml
 
 # dbt artifacts
 target/

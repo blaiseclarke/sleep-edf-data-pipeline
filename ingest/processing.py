@@ -46,7 +46,7 @@ def batch_process_file(
         events=events,
         event_id=event_id,
         tmin=0.0,
-        tmax=30.0,
+        tmax=30.0 - 1.0 / raw.info["sfreq"],
         baseline=None,
         preload=False,
         on_missing="ignore",

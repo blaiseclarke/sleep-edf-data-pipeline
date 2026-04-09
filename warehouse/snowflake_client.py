@@ -19,7 +19,7 @@ class SnowflakeClient(WarehouseClient):
         self.warehouse = os.getenv("SNOWFLAKE_WAREHOUSE")
         self.database = os.getenv("SNOWFLAKE_DATABASE")
         self.schema = os.getenv("SNOWFLAKE_SCHEMA")
-        self.role = os.getenv("SNOWFLAKE_ROLE", "ACCOUNTADMIN")
+        self.role = os.getenv("SNOWFLAKE_ROLE")
 
         # Validate required credentials
         missing = []
@@ -29,6 +29,8 @@ class SnowflakeClient(WarehouseClient):
             missing.append("SNOWFLAKE_PASSWORD")
         if not self.account:
             missing.append("SNOWFLAKE_ACCOUNT")
+        if not self.role:
+            missing.append("SNOWFLAKE_ROLE")
 
         if missing:
             raise ValueError(
@@ -69,16 +71,8 @@ class SnowflakeClient(WarehouseClient):
             raise ValueError(f"Invalid subject_id: {subject_id}")
 
         conn = self._get_connection()
+        cursor = conn.cursor()
         try:
-            # Clears existing data for this subject (idempotency)
-            if overwrite:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = %s", (subject_id,)
-                )
-
-            cursor = conn.cursor()
-
             # Create a temporary internal stage with validated identifier
             stage_name = f"STAGE_SLEEP_EPOCHS_{subject_id}"
             if not re.match(r"^[A-Z_][A-Z0-9_]*$", stage_name):
@@ -88,27 +82,38 @@ class SnowflakeClient(WarehouseClient):
             try:
                 # 1. PUT files into the internal stage
                 # Using auto_compress=False because parquet is already compressed
-                # Escape single quotes in path for safety
-                safe_path = str(path_obj.absolute()).replace("'", "")
+                safe_path = str(path_obj.absolute()).replace("'", "''")
                 put_command = f"PUT 'file://{safe_path}/*.parquet' @{stage_name} AUTO_COMPRESS=FALSE"
                 cursor.execute(put_command)
 
-                # 2. COPY INTO the target table
-                # We use MATCH_BY_COLUMN_NAME to map Parquet columns to Snowflake columns automatically
-                copy_command = f"""
-                    COPY INTO SLEEP_EPOCHS
-                    FROM @{stage_name}
-                    FILE_FORMAT = (TYPE = PARQUET)
-                    MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
-                    PURGE = TRUE
-                """
-                cursor.execute(copy_command)
+                # 2. DELETE + COPY in a transaction for atomicity
+                cursor.execute("BEGIN")
+                try:
+                    if overwrite:
+                        cursor.execute(
+                            "DELETE FROM SLEEP_EPOCHS WHERE SUBJECT_ID = %s",
+                            (subject_id,),
+                        )
+
+                    copy_command = f"""
+                        COPY INTO SLEEP_EPOCHS
+                        FROM @{stage_name}
+                        FILE_FORMAT = (TYPE = PARQUET)
+                        MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
+                        PURGE = TRUE
+                    """
+                    cursor.execute(copy_command)
+                    cursor.execute("COMMIT")
+                except Exception:
+                    cursor.execute("ROLLBACK")
+                    raise
 
             finally:
-                # 3. Clean up the stage
+                # Clean up the stage
                 cursor.execute(f"DROP STAGE IF EXISTS {stage_name}")
 
         finally:
+            cursor.close()
             conn.close()
 
     def log_ingestion_error(
@@ -122,8 +127,8 @@ class SnowflakeClient(WarehouseClient):
         Logs an ingestion error into the INGESTION_ERRORS table.
         """
         conn = self._get_connection()
+        cursor = conn.cursor()
         try:
-            cursor = conn.cursor()
             cursor.execute(
                 """
                 INSERT INTO INGESTION_ERRORS (SUBJECT_ID, ERROR_TYPE, ERROR_MESSAGE, STACK_TRACE)
@@ -132,4 +137,5 @@ class SnowflakeClient(WarehouseClient):
                 (subject_id, error_type, error_message, stack_trace),
             )
         finally:
+            cursor.close()
             conn.close()

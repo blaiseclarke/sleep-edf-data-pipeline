@@ -1,7 +1,6 @@
 from prefect import task, flow, get_run_logger
 from pandera.errors import SchemaErrors
 
-import shutil
 import subprocess
 
 from ingest.processing import batch_process_file
@@ -29,9 +28,10 @@ def extract_to_parquet(subject_id: int) -> dict:
     # Create a staging directory for this subject
     # ex. data/staging/subject_1/
     staging_dir = STAGING_DIR / f"subject_{subject_id}"
-    if staging_dir.exists():
-        shutil.rmtree(staging_dir)  # Clean start
     staging_dir.mkdir(parents=True, exist_ok=True)
+    # Remove only parquet files instead of rmtree to avoid race conditions on retry
+    for f in staging_dir.glob("*.parquet"):
+        f.unlink()
 
     # Fetch calls (should trigger retry if they fail)
     filepaths = fetch_data(subjects=[subject_id], recording=[RECORDING])
