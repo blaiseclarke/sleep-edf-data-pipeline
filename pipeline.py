@@ -1,6 +1,7 @@
 from prefect import task, flow, get_run_logger
 from pandera.errors import SchemaErrors
 
+import os
 import subprocess
 
 from ingest.processing import batch_process_file
@@ -99,51 +100,53 @@ def load_parquet_to_warehouse(
     client.load_epochs(staging_path, subject_id, overwrite=True)
 
 
+def _run_dbt(arguments: list, logger) -> None:
+    """
+    Runs one dbt subcommand, relaying its output line by line as it arrives.
+
+    dbt writes progress per model, so capturing the output and logging it in one
+    block at the end hides how far a long build has got and, on failure, holds
+    back the very lines needed to diagnose it.
+    """
+    argv = ["dbt", *arguments]
+    logger.info("Executing: %s", " ".join(argv))
+
+    with subprocess.Popen(
+        argv,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    ) as process:
+        for line in process.stdout or []:
+            line = line.rstrip()
+            if line:
+                logger.info(line)
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f"`{' '.join(argv)}` failed with exit code {process.returncode}"
+        )
+
+
 @task
 def run_dbt_transformations():
     """
     Executes the dbt models using the local CLI to transform the newly loaded data.
     """
-    import os
-
     logger = get_run_logger()
 
     warehouse_type = os.getenv("WAREHOUSE_TYPE", "duckdb").lower()
     target = "dev_duckdb" if warehouse_type == "duckdb" else "dev"
 
-    logger.info("Executing dbt deps to ensure packages are installed...")
-    deps_result = subprocess.run(
-        ["dbt", "deps", "--profiles-dir", "."], capture_output=True, text=True
-    )
-    if deps_result.returncode != 0:
-        logger.error(f"dbt deps failed:\n{deps_result.stdout}\n{deps_result.stderr}")
-        raise RuntimeError("dbt deps failed")
-    logger.info(deps_result.stdout)
+    # Install package dependencies (dbt_utils) before building
+    _run_dbt(["deps", "--profiles-dir", "."], logger)
 
-    logger.info(f"Executing dbt run against target: {target}...")
-
-    # Run transformations
-    run_result = subprocess.run(
-        ["dbt", "run", "--profiles-dir", ".", "--target", target],
-        capture_output=True,
-        text=True,
-    )
-    if run_result.returncode != 0:
-        logger.error(f"dbt run failed:\n{run_result.stdout}\n{run_result.stderr}")
-        raise RuntimeError("dbt run failed")
-    logger.info(run_result.stdout)
-
-    logger.info(f"Executing dbt test against target: {target}...")
-    # Run tests
-    test_result = subprocess.run(
-        ["dbt", "test", "--profiles-dir", ".", "--target", target],
-        capture_output=True,
-        text=True,
-    )
-    if test_result.returncode != 0:
-        logger.error(f"dbt test failed:\n{test_result.stdout}\n{test_result.stderr}")
-        raise RuntimeError("dbt test failed")
-    logger.info(test_result.stdout)
+    # `build` walks the DAG running each model and then its tests, so a model
+    # whose tests fail never has dependents built on top of it. Running every
+    # model first and testing afterwards materialised the bad data throughout
+    # the warehouse before anything noticed.
+    _run_dbt(["build", "--profiles-dir", ".", "--target", target], logger)
 
 
 @flow(name="Sleep-EDF Ingestion Pipeline")
