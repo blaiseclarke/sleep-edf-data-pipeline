@@ -23,7 +23,7 @@ Explore sleep architecture and power ratios from the Sleep-EDF age study dataset
 
 **Features:**
 *   **Subject Viewer**: Inspect individual recordings (Hypnogram, spectral power).
-*   **Clinical Metrics**: Total sleep time, awakenings, and sleep stage percentages.
+*   **Clinical Metrics**: Total sleep time, sleep efficiency, awakenings, and sleep stage percentages, scoped to each subject's main sleep episode.
 
 ---
 
@@ -189,17 +189,25 @@ The pipeline is warehouse-agnostic via the `WarehouseClient` protocol.
 The dbt project creates a trusted data lineage, transforming raw logs into analytics-ready models:
 
 * **Staging (`staging_sleep_data`):** Handles column standardization and explicit type casting.
-* **Intermediate (`sleep_metrics`):** Calculates rolling power averages over sliding epochs to smooth out signal artifacts and deviations.
+* **Intermediate (`sleep_metrics`):** Calculates rolling power averages over sliding epochs to smooth out signal artifacts and deviations, and detects each subject's **main sleep episode** (see below).
 * **Marts (`sleep_summary`):** Aggregates data into clinical insights:
-    * Sleep Architecture (Deep vs. Light vs. REM %)
+    * Sleep architecture (deep vs. light vs. REM %)
+    * Sleep efficiency and wake after sleep onset (WASO)
     * Awakening counts
     * Average power across frequency bands
+
+##### Sleep period detection
+Sleep-EDF recordings are ~22 hour ambulatory recordings that span an entire day, and many subjects nap. Aggregating over the whole recording therefore describes the *day*, not the night — it reports 22 hours of "time in bed", counts every afternoon transition into wake as an awakening, and averages band power across hours of ordinary wakefulness.
+
+`sleep_metrics` splits each recording into sleep episodes wherever a continuous wake bout runs longer than `sleep_episode_gap_minutes` (default 60), then keeps the episode containing the most sleep. Every night-level metric in `sleep_summary` is scoped to that window; only `total_recording_minutes` describes the full recording. The dataset carries no lights-off annotation, so this window is the closest available proxy for time in bed.
+
+Across the 77 ingested subjects this puts the cohort in a physiologically plausible range — 7.6 h time in bed, 6.8 h total sleep time, 52 min WASO, and 89% mean sleep efficiency (median 92%).
 
 #### 4. Data Integrity & Observability
 Reliability is enforced through automated checks and failure logging:
 * **Validation (Pandera):** Sleep stages and spectral powers are validated against strict contracts.
 * **Error Warehouse:** Failures are intercepted and logged sequentially to the `INGESTION_ERRORS` table, ensuring 100% thread safety and detailed stack trace persistence even during parallel runs.
-* **dbt Tests:** Custom SQL tests ensure logical consistency (ex. *Rolling averages cannot be negative*).
+* **dbt Tests:** Generic and `dbt_utils` tests enforce both schema and logical consistency — surrogate key uniqueness, non-null spectral powers, an `accepted_values` contract on sleep stages, sleep efficiency bounded to 0–1, and cross-column invariants (*total sleep time cannot exceed the sleep period*; *stage percentages must sum to 1*).
 
 ---
 

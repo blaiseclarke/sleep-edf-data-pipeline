@@ -47,11 +47,12 @@ def load_analysis_data(subject_id):
 
     # Get epoch data
     epoch_query = """
-        SELECT 
-            epoch_idx, 
-            sleep_stage, 
-            is_stage_transition
-        FROM sleep_metrics 
+        SELECT
+            epoch_idx,
+            sleep_stage,
+            is_stage_transition,
+            is_in_sleep_period
+        FROM sleep_metrics
         WHERE subject_id = ?
         ORDER BY epoch_idx
     """
@@ -81,22 +82,40 @@ if summary_row.empty:
 
 metrics = summary_row.iloc[0]
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 
 c1.metric("Total Sleep Time", f"{metrics['total_sleep_minutes']:.1f} min")
-c2.metric("Awakenings", int(metrics["number_of_awakenings"]))
-c3.metric("Deep Sleep %", f"{metrics['deep_sleep_percentage'] * 100:.1f}%")
-c4.metric("Light Sleep %", f"{metrics['light_sleep_percentage'] * 100:.1f}%")
-c5.metric("REM Sleep %", f"{metrics['rem_sleep_percentage'] * 100:.1f}%")
+c2.metric("Sleep Efficiency", f"{metrics['sleep_efficiency'] * 100:.1f}%")
+c3.metric("Awakenings", int(metrics["number_of_awakenings"]))
+c4.metric("Deep Sleep %", f"{metrics['deep_sleep_percentage'] * 100:.1f}%")
+c5.metric("Light Sleep %", f"{metrics['light_sleep_percentage'] * 100:.1f}%")
+c6.metric("REM Sleep %", f"{metrics['rem_sleep_percentage'] * 100:.1f}%")
+
+st.caption(
+    f"Sleep period: {metrics['sleep_period_minutes']:.0f} min "
+    f"({metrics['waso_minutes']:.0f} min awake after onset) "
+    f"within a {metrics['total_recording_minutes'] / 60:.1f} h recording. "
+    "Metrics below cover the sleep period, not the full recording."
+)
 
 # Temporal analysis
 st.subheader("Sleep Staging")
 
 # Map stages to numbers for plotting
-stage_map = {"W": 0, "REM": 1, "N1": 2, "N2": 3, "N3": 4, "MOVE": 0, "NAN": 0}
+stage_map = {"W": 0, "REM": 1, "N1": 2, "N2": 3, "N3": 4}
 
+# These are day-long ambulatory recordings, so plotting the whole thing buries
+# the night in hours of flat wakefulness. Show the sleep period instead.
+sleep_period_df = epoch_df[epoch_df["is_in_sleep_period"]].copy()
+if sleep_period_df.empty:
+    st.warning(f"No scored sleep found for Subject {selected_subject}")
+    st.stop()
+
+epoch_df = sleep_period_df
 epoch_df["stage_num"] = epoch_df["sleep_stage"].map(stage_map)
-epoch_df["time_min"] = epoch_df["epoch_idx"] * 0.5  # 30s epochs
+# 30s epochs, measured from sleep onset
+onset_idx = epoch_df["epoch_idx"].min()
+epoch_df["time_min"] = (epoch_df["epoch_idx"] - onset_idx) * 0.5
 
 fig_hypno = go.Figure()
 fig_hypno.add_trace(
@@ -119,7 +138,7 @@ fig_hypno.update_layout(
         showgrid=True,
         gridcolor="lightgrey",
     ),
-    xaxis_title="Time (Minutes)",
+    xaxis_title="Time from Sleep Onset (Minutes)",
     xaxis=dict(showgrid=True, gridcolor="lightgrey"),
     plot_bgcolor="white",
     height=300,

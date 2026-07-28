@@ -38,5 +38,42 @@ models:
                   - 'N2'
                   - 'N3'
                   - 'REM'
-                  - 'NAN'
-                  - 'MOVE'
+
+  - name: sleep_summary
+    description: >
+      One row per subject. Night-level metrics are scoped to the sleep period
+      (first scored sleep epoch through the last), because Sleep-EDF recordings
+      run for roughly 22 hours and would otherwise be dominated by the waking day.
+    tests:
+      # A subject cannot sleep for longer than they were in bed
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_sleep_minutes <= sleep_period_minutes"
+      # Stage shares partition total sleep time, so they sum to 1
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: >
+              abs(
+                deep_sleep_percentage + light_sleep_percentage
+                + rem_sleep_percentage - 1
+              ) < 0.0001
+    columns:
+      - name: subject_id
+        tests:
+          - not_null
+          - unique
+      - name: total_sleep_minutes
+        tests:
+          - not_null
+      - name: number_of_awakenings
+        tests:
+          - not_null
+      - name: sleep_efficiency
+        description: Total sleep time over the sleep period duration.
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 1
+                inclusive: true

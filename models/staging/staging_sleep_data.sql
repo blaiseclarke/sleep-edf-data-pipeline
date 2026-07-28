@@ -12,7 +12,7 @@ with
 
             -- Type hygiene
             -- Explicitly cast everything to ensure DuckDB knows these are numbers
-            cast(subject_id as varchar) as subject_id,
+            cast(subject_id as int) as subject_id,
             cast(epoch_idx as int) as epoch_idx,
             cast(stage as varchar) as sleep_stage,
 
