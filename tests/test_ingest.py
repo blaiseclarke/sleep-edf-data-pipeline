@@ -1,7 +1,8 @@
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 from pandera.errors import SchemaError
+
 from ingest.processing import calculate_band_power
 from validators import SleepSchema
 

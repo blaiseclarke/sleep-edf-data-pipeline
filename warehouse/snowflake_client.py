@@ -1,6 +1,7 @@
 import os
-from typing import Optional
+
 import snowflake.connector
+
 from warehouse.base import WarehouseClient
 
 
@@ -163,7 +164,7 @@ class SnowflakeClient(WarehouseClient):
         subject_id: int,
         error_type: str,
         error_message: str,
-        stack_trace: Optional[str] = None,
+        stack_trace: str | None = None,
     ) -> None:
         """
         Logs an ingestion error into the INGESTION_ERRORS table.

@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from pipeline import run_ingestion_pipeline
 
 
@@ -22,11 +24,11 @@ def test_staging_cleanup_only_removes_parquet(tmp_path, monkeypatch):
     (subject_dir / "metadata.json").write_text('{"note": "keep me"}')
 
     # Import after monkeypatching so the task picks up the patched STAGING_DIR
-    from pipeline import extract_to_parquet
-
     # Mock fetch_data to return no files (triggers early return)
     # Also mock get_run_logger since there's no active Prefect context
     import logging
+
+    from pipeline import extract_to_parquet
 
     with (
         patch("pipeline.fetch_data", return_value=[]),
@@ -83,6 +85,7 @@ def _fake_popen(recorded, failing_subcommand=None, lines=()):
 
 def _invoke_dbt_task(recorded, monkeypatch, warehouse_type="duckdb", **popen_kwargs):
     import logging
+
     import pipeline
 
     monkeypatch.setenv("WAREHOUSE_TYPE", warehouse_type)
@@ -160,3 +163,36 @@ def test_dbt_output_is_streamed_to_the_logger(monkeypatch, caplog):
     assert "Done." in messages
     # Blank lines are dropped rather than logged as empty records
     assert "" not in messages
+
+
+def test_max_workers_reads_the_documented_env_var(monkeypatch):
+    """
+    PREFECT_MAX_WORKERS was documented in the README for months while nothing
+    in the code read it. Assert the wiring rather than the prose.
+    """
+    import importlib
+
+    import ingest.config
+
+    monkeypatch.setenv("PREFECT_MAX_WORKERS", "7")
+    reloaded = importlib.reload(ingest.config)
+    assert reloaded.MAX_WORKERS == 7
+
+    # A zero or negative cap would mean no workers at all.
+    monkeypatch.setenv("PREFECT_MAX_WORKERS", "0")
+    assert importlib.reload(ingest.config).MAX_WORKERS == 1
+
+    monkeypatch.delenv("PREFECT_MAX_WORKERS")
+    assert importlib.reload(ingest.config).MAX_WORKERS == 3
+
+
+def test_flow_bounds_its_task_runner():
+    """Extraction fans out under a bounded pool, not one thread per subject."""
+    from prefect.task_runners import ThreadPoolTaskRunner
+
+    import pipeline
+    from ingest.config import MAX_WORKERS
+
+    runner = pipeline.run_ingestion_pipeline.task_runner
+    assert isinstance(runner, ThreadPoolTaskRunner)
+    assert runner._max_workers == MAX_WORKERS

@@ -3,4 +3,16 @@
 # releases, and CI installs ruff from requirements.txt, so relying on the
 # defaults meant a new ruff release could turn CI red without a code change.
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F"]
+select = [
+    "E4", "E7", "E9", "F",  # pyflakes and the pycodestyle subset ruff enables by default
+    "I",                     # import sorting
+    "UP",                    # pyupgrade: modern syntax for the Python we target
+    "B",                     # bugbear: likely bugs rather than style
+    "C4",                    # comprehension clarity
+]
+ignore = [
+    # `dict(color=..., width=...)` is how plotly's own API and documentation are
+    # written. Rewriting the chart code to dict literals to satisfy this rule
+    # would read as foreign to anyone who knows the library.
+    "C408",
+]

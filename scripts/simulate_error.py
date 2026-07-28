@@ -1,8 +1,9 @@
 import duckdb
+from prefect import flow
+
+from ingest.config import DB_PATH
 from pipeline import extract_to_parquet
 from warehouse.duckdb_client import DuckDBClient
-from ingest.config import DB_PATH
-from prefect import flow
 
 
 @flow

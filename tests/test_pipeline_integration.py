@@ -1,7 +1,9 @@
-import pytest
-import pandas as pd
+from unittest.mock import MagicMock, patch
+
 import duckdb
-from unittest.mock import patch, MagicMock
+import pandas as pd
+import pytest
+
 from pipeline import run_ingestion_pipeline
 from scripts.setup_db import setup_database
 
