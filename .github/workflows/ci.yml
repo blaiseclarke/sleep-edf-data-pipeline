@@ -63,6 +63,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    # The default "docker" driver cannot export a layer cache, so the GitHub
+    # Actions cache backend below needs the docker-container driver this sets up.
+    - name: Set up Buildx
+      uses: docker/setup-buildx-action@v3
+
     # The image is a documented way to run the pipeline, so a Dockerfile that
     # no longer builds should fail CI rather than surface at `docker compose up`.
     - name: Build the pipeline image
