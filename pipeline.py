@@ -1,5 +1,6 @@
 import os
 import subprocess
+import traceback
 
 from pandera.errors import SchemaErrors
 from prefect import flow, get_run_logger, task
@@ -17,6 +18,23 @@ from ingest.processing import batch_process_file
 from validators import SleepSchema
 from warehouse.base import WarehouseClient
 from warehouse.factory import get_warehouse_client
+
+
+def describe_error(error) -> tuple[str, str, str | None]:
+    """
+    Normalises the two shapes extract_to_parquet reports failures in onto the
+    INGESTION_ERRORS columns.
+
+    A schema violation returns {"type": ..., "message": ..., "stack_trace": ...},
+    but the missing-file path returns a bare string.
+    """
+    if isinstance(error, dict):
+        return (
+            error.get("type", "ExtractionFailed"),
+            error.get("message", ""),
+            error.get("stack_trace"),
+        )
+    return "ExtractionFailed", str(error), None
 
 
 @task(retries=2, retry_delay_seconds=10)
@@ -83,7 +101,11 @@ def extract_to_parquet(subject_id: int) -> dict:
         return {
             "subject_id": subject_id,
             "path": None,
-            "error": {"type": "SchemaError", "message": str(e)},
+            "error": {
+                "type": "SchemaError",
+                "message": str(e),
+                "stack_trace": traceback.format_exc(),
+            },
         }
 
 
@@ -192,14 +214,13 @@ def run_ingestion_pipeline():
             result = result_future.result()
 
             if result.get("error"):
-                err = result["error"]
-                # Handle nested error dicts or string errors
-                msg = err["message"] if isinstance(err, dict) else str(err)
-                logger.warning(f"Skipping subject {subject_id}: {msg}")
+                error_type, error_message, stack_trace = describe_error(result["error"])
+                logger.warning(f"Skipping subject {subject_id}: {error_message}")
                 warehouse_client.log_ingestion_error(
                     subject_id=subject_id,
-                    error_type="ExtractionFailed",
-                    error_message=msg,
+                    error_type=error_type,
+                    error_message=error_message,
+                    stack_trace=stack_trace,
                 )
                 failed_subjects.append(subject_id)
                 continue
@@ -212,6 +233,22 @@ def run_ingestion_pipeline():
             raise
         except Exception as e:
             logger.error(f"Pipeline loop failed for subject {subject_id}: {e}")
+            # Raised failures — corrupt EDFs, exhausted fetch retries, load
+            # errors — surface here rather than in an error dict, and they
+            # belong in INGESTION_ERRORS too, not only in the logs. Recording
+            # must not abort the loop if the warehouse itself is struggling.
+            try:
+                warehouse_client.log_ingestion_error(
+                    subject_id=subject_id,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    stack_trace=traceback.format_exc(),
+                )
+            except Exception as log_error:
+                logger.error(
+                    f"Could not record subject {subject_id}'s failure in "
+                    f"INGESTION_ERRORS: {log_error}"
+                )
             failed_subjects.append(subject_id)
 
     if failed_subjects:

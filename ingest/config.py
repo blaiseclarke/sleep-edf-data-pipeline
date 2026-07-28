@@ -39,12 +39,15 @@ def fetch_data(subjects, recording):
     Args:
         subjects (list[int]): Which subjects to download (ex. [1, 2]).
         recording (list[int]): Which recording session to grab (1 is the default, 2 is often the fallout).
+            Age study only: the telemetry study carries a single recording per
+            subject, so MNE's telemetry fetcher has no `recording` parameter.
 
     Returns:
         list[list[str]]: A list of [psg_path, hypnogram_path] pairs for each subject.
     """
     if STUDY == "telemetry":
-        return fetch_telemetry_data(
-            subjects=subjects, recording=recording, on_missing="warn"
-        )
+        # Passing `recording` (or `on_missing`) here raised TypeError: the
+        # temazepam fetcher accepts neither, so STUDY=telemetry crashed before
+        # downloading anything.
+        return fetch_telemetry_data(subjects=subjects)
     return fetch_age_data(subjects=subjects, recording=recording, on_missing="warn")

@@ -42,8 +42,13 @@ def test_staging_cleanup_only_removes_parquet(tmp_path, monkeypatch):
     assert result["error"] == "No files found"
 
 
-def test_config_telemetry_passes_recording():
-    """Verifies that fetch_data forwards the recording parameter for the telemetry study."""
+def test_config_telemetry_does_not_pass_recording():
+    """
+    MNE's telemetry (temazepam) fetcher has no `recording` or `on_missing`
+    parameters — the study carries a single recording per subject. Forwarding
+    them raised TypeError on the very first fetch, so STUDY=telemetry never
+    ingested a single epoch.
+    """
     with (
         patch("ingest.config.STUDY", "telemetry"),
         patch("ingest.config.fetch_telemetry_data") as mock_fetch,
@@ -53,9 +58,7 @@ def test_config_telemetry_passes_recording():
 
         fetch_data(subjects=[0], recording=[1])
 
-        mock_fetch.assert_called_once_with(
-            subjects=[0], recording=[1], on_missing="warn"
-        )
+        mock_fetch.assert_called_once_with(subjects=[0])
 
 
 class _FakeProcess:

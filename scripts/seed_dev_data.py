@@ -13,6 +13,10 @@ Deterministic: the same seed produces the same table on every run.
 import argparse
 import logging
 import random
+import tempfile
+from pathlib import Path
+
+import pandas as pd
 
 from warehouse.factory import get_warehouse_client
 
@@ -66,33 +70,38 @@ def build_rows(subjects, seed=0):
     return rows
 
 
+SEED_COLUMNS = [
+    "SUBJECT_ID",
+    "EPOCH_IDX",
+    "STAGE",
+    "DELTA_POWER",
+    "THETA_POWER",
+    "ALPHA_POWER",
+    "SIGMA_POWER",
+    "BETA_POWER",
+]
+
+
 def seed(subjects=3, seed_value=0):
     client = get_warehouse_client()
     client.ensure_tables_exist()
+    client.clear_epochs()
 
-    rows = build_rows(subjects, seed_value)
+    frame = pd.DataFrame(build_rows(subjects, seed_value), columns=SEED_COLUMNS)
 
-    # Written through the client's own connection settings rather than a second
-    # DuckDB handle, so this works for whichever warehouse is configured.
-    import duckdb
+    # Load through the client's native path — Parquet staging plus
+    # load_epochs, the same route the pipeline takes — rather than a DuckDB
+    # handle on client.db_path, which only exists on the DuckDB client and
+    # crashed outright with AttributeError when Snowflake was configured.
+    with tempfile.TemporaryDirectory() as staging_root:
+        for subject_id, subject_frame in frame.groupby("SUBJECT_ID"):
+            staging_dir = Path(staging_root) / f"subject_{subject_id}"
+            staging_dir.mkdir()
+            subject_frame.to_parquet(staging_dir / "part_0.parquet", index=False)
+            client.load_epochs(str(staging_dir), int(subject_id), overwrite=True)
 
-    connection = duckdb.connect(client.db_path)
-    try:
-        connection.execute("DELETE FROM SLEEP_EPOCHS")
-        connection.executemany(
-            """
-            INSERT INTO SLEEP_EPOCHS
-                (SUBJECT_ID, EPOCH_IDX, STAGE, DELTA_POWER, THETA_POWER,
-                 ALPHA_POWER, SIGMA_POWER, BETA_POWER)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            rows,
-        )
-    finally:
-        connection.close()
-
-    logger.info("Seeded %d epochs across %d subjects.", len(rows), subjects)
-    return len(rows)
+    logger.info("Seeded %d epochs across %d subjects.", len(frame), subjects)
+    return len(frame)
 
 
 if __name__ == "__main__":

@@ -112,6 +112,14 @@ class DuckDBClient(WarehouseClient):
         finally:
             connection.close()
 
+    def clear_epochs(self) -> None:
+        """Deletes every row from SLEEP_EPOCHS."""
+        connection = duckdb.connect(self.db_path)
+        try:
+            connection.execute("DELETE FROM SLEEP_EPOCHS")
+        finally:
+            connection.close()
+
     def log_ingestion_error(
         self,
         subject_id: int,

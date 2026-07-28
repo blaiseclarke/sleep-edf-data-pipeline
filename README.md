@@ -127,8 +127,11 @@ Note that `PREFECT_API_URL=""` does **not** work — Prefect reads an empty stri
 *   **Python (Local):** Automatically reads `.env` (via `python-dotenv`).
 *   **dbt (Local):** dbt doesn't automatically read `.env` files. You'll need to export them to your shell environment first:
     ```bash
-    # Export variables from .env
-    export $(grep -v '^#' .env | xargs)
+    # Export variables from .env. `set -a` marks every assignment for export;
+    # quote any value containing spaces (SNOWFLAKE_PASSWORD="my secret").
+    # `export $(grep ... | xargs)` is not safe here: it word-splits values and
+    # silently exports a truncated password.
+    set -a; source .env; set +a
 
     # Run dbt. profiles.yml lives in the repo root rather than ~/.dbt,
     # so every dbt command needs --profiles-dir .
@@ -218,7 +221,7 @@ Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. T
 * **Memory Efficiency:** Utilizes `preload=False` (memory mapping) to handle large EEG files with minimal RAM impact.
 * **Configurable Parameters:** The pipeline range and logic are controlled via environment variables:
     * `STARTING_SUBJECT` / `ENDING_SUBJECT`: Define the participant ID range (0-82 for age study, 0-21 for telemetry study).
-    * `RECORDING`: Specifies which session recording to fetch (default: 1).
+    *   `RECORDING`: Specifies which session recording to fetch (default: 1). Age study only — the telemetry study carries a single recording per subject and ignores this.
     * `DB_PATH`: Local path for the DuckDB database (default: `data/sleep_data.db`).
     * `PREFECT_MAX_WORKERS`: Cap on concurrently extracted subjects, applied through the flow's `ThreadPoolTaskRunner` (default: 3). Each worker holds a batch of epochs in memory, so this is the memory/throughput dial.
     * `STUDY`: Selects the Sleep-EDF study (options: `age`, `telemetry`, default: `age`).
@@ -234,7 +237,7 @@ Both backends declare `SLEEP_EPOCHS` and `INGESTION_ERRORS` with identical colum
 
 ```bash
 # Set WAREHOUSE_TYPE=snowflake plus the SNOWFLAKE_* variables in .env, then
-export $(grep -v '^#' .env | xargs)              # dbt does not read .env itself
+set -a; source .env; set +a                      # dbt does not read .env itself
 PYTHONPATH=. python scripts/setup_db.py          # optional; the pipeline also does this
 python pipeline.py
 ```

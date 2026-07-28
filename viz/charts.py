@@ -88,7 +88,9 @@ def architecture_figure(metrics: pd.Series, textured: bool, colours: dict) -> go
                         size=7,
                     ),
                 ),
-                text=[f"{share * 100:.0f}%"],
+                # Plotly fonts carry no weight property, so the bold comes from
+                # <b> markup in the text itself.
+                text=[f"<b>{share * 100:.0f}%</b>"],
                 # "auto" measures the label and moves it outside rather than
                 # letting a narrow segment clip it. Anchoring inside labels to
                 # the middle keeps the final segment's label off the plot edge,
