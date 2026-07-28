@@ -1,0 +1,6 @@
+# Ruff is the only tool configured here. Declaring the rule set explicitly
+# keeps `ruff check` deterministic: the default selection changes between ruff
+# releases, and CI installs ruff from requirements.txt, so relying on the
+# defaults meant a new ruff release could turn CI red without a code change.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
