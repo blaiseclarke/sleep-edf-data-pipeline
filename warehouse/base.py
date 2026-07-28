@@ -1,4 +1,4 @@
-from typing import Optional, Protocol
+from typing import Protocol
 
 
 class WarehouseClient(Protocol):
@@ -26,7 +26,7 @@ class WarehouseClient(Protocol):
         subject_id: int,
         error_type: str,
         error_message: str,
-        stack_trace: Optional[str] = None,
+        stack_trace: str | None = None,
     ) -> None:
         """Saves error details to a table to debug them later."""
         ...

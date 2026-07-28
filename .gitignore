@@ -16,11 +16,24 @@ data/*
 *.db
 *.log
 .user.yml
+ci_warehouse/
+
+# Tracked on purpose, despite the rules above. The Streamlit demo is deployed
+# straight from this repository and queries this file, so it has to be in the
+# tree; Streamlit Cloud has no build step that could regenerate it. Rebuild it
+# with `make demo-db` after changing any model. Roughly 21 MB.
+!data/sleep_data.db
 
 # dbt artifacts
 target/
 dbt_packages/
 logs/
+dbt_internal_packages/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
 
 # Profiling
 *.bin

@@ -36,6 +36,8 @@ The dashboard is built so that nothing is gated behind colour, motion, or a mous
 *   **Dark mode is selected, not flipped.** The dark palette is its own set of steps chosen for the dark surface, and the charts follow the viewer's light/dark setting.
 *   **Motion and focus.** `prefers-reduced-motion` is respected and chart transitions are disabled outright; keyboard focus rings are restored at high contrast.
 
+> **On `data/sleep_data.db`.** The demo is deployed straight from this repository and queries that file, and Streamlit Cloud has no build step that could regenerate it, so it is tracked (~21 MB) despite `.gitignore` excluding `data/` and `*.db` in general. `.gitignore` carries an explicit negation to record that. Run `make demo-db` to rebuild it after changing a model; it builds into a fresh file, because DuckDB does not reclaim pages and rebuilding in place grows the artifact every time.
+
 ---
 
 ### Architecture
@@ -62,6 +64,7 @@ The dashboard is built so that nothing is gated behind colour, motion, or a mous
 * **Upfront Fetching:** Pre-fetches MNE data to prevent filesystem locking during parallel extraction.
 * **Robust Observability:** Thread-safe error logging captures all extraction failures in the `INGESTION_ERRORS` table.
 * **Reproducibility:** Fully containerized with Docker; local development automated via Makefile.
+* **CI:** Every push runs ruff, the unit tests with coverage, a full `dbt build` against a seeded DuckDB, and a Docker image build. Ruff is pinned and its rule set declared, so a new ruff release cannot turn the build red on its own.
 
 <img width="986" height="497" alt="Prefect dashboard" src="https://github.com/user-attachments/assets/ed9f1351-14b1-4301-a5c0-e6c18ce97ccb" />
 
@@ -144,20 +147,29 @@ cd sleep-edf-data-pipeline
 
 # 2. Setup and install
 make install
+cp .env.example .env        # then edit if you want anything other than the defaults
 
-# 3. Quick test (lint, format, run)
+# 3. Lint, format and test
 make all
 
-# 4. Initialize local database
+# 4. Initialize the local database
 make setup-db
 
-# 5. Run, lint, and test
-make lint    # Check for errors
-make format  # Autoformat code
-make run     # Run parallel ingestion and dbt ELT pipeline
+# 5. Everyday targets
+make lint       # Check for errors
+make format     # Autoformat code
+make test       # Unit tests
+make coverage   # Unit tests with a coverage report
+make run        # Run parallel ingestion and the dbt ELT pipeline
+make dashboard  # Serve the Streamlit dashboard
+make docker     # Build the container image
 
-# 6. Test observability
-python simulate_error.py  # Verifies the error warehouse captures failures
+# 6. Work on the dbt models without downloading 2 GB of recordings
+make seed       # Synthetic epochs, including a daytime nap
+make dbt        # dbt deps + dbt build against them
+
+# 7. Test observability
+PYTHONPATH=. python scripts/simulate_error.py  # Verifies failures reach INGESTION_ERRORS
 ```
 
 #### Option 3: Manual Python Execution
@@ -188,7 +200,7 @@ Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. T
     * `STARTING_SUBJECT` / `ENDING_SUBJECT`: Define the participant ID range (0-82 for age study, 0-21 for telemetry study).
     * `RECORDING`: Specifies which session recording to fetch (default: 1).
     * `DB_PATH`: Local path for the DuckDB database (default: `data/sleep_data.db`).
-    * `PREFECT_MAX_WORKERS`: Limit on concurrent subject processing (default: 3).
+    * `PREFECT_MAX_WORKERS`: Cap on concurrently extracted subjects, applied through the flow's `ThreadPoolTaskRunner` (default: 3). Each worker holds a batch of epochs in memory, so this is the memory/throughput dial.
     * `STUDY`: Selects the Sleep-EDF study (options: `age`, `telemetry`, default: `age`).
 
 #### 2. Warehousing (DuckDB / Snowflake)

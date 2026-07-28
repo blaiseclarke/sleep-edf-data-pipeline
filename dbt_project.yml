@@ -6,7 +6,9 @@ profile: 'sleep_analytics'
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
-test-paths: ["tests"]
+# Not "tests": that is the pytest directory. dbt only reads .sql/.yml there,
+# so the collision is currently harmless, but it is a trap worth removing.
+test-paths: ["dbt_tests"]
 seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]

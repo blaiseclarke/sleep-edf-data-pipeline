@@ -1,17 +1,19 @@
-from prefect import task, flow, get_run_logger
-from pandera.errors import SchemaErrors
-
 import os
 import subprocess
 
-from ingest.processing import batch_process_file
+from pandera.errors import SchemaErrors
+from prefect import flow, get_run_logger, task
+from prefect.task_runners import ThreadPoolTaskRunner
+
 from ingest.config import (
     ENDING_SUBJECT,
+    MAX_WORKERS,
     RECORDING,
-    STARTING_SUBJECT,
     STAGING_DIR,
+    STARTING_SUBJECT,
     fetch_data,
 )
+from ingest.processing import batch_process_file
 from validators import SleepSchema
 from warehouse.base import WarehouseClient
 from warehouse.factory import get_warehouse_client
@@ -149,7 +151,12 @@ def run_dbt_transformations():
     _run_dbt(["build", "--profiles-dir", ".", "--target", target], logger)
 
 
-@flow(name="Sleep-EDF Ingestion Pipeline")
+# Each mapped subject holds a batch of EEG epochs in memory while it computes
+# its spectra, so the fan-out is bounded rather than one thread per subject.
+@flow(
+    name="Sleep-EDF Ingestion Pipeline",
+    task_runner=ThreadPoolTaskRunner(max_workers=MAX_WORKERS),
+)
 def run_ingestion_pipeline():
     logger = get_run_logger()
 
@@ -178,7 +185,9 @@ def run_ingestion_pipeline():
 
     # Load to warehouse (serial) -> reads from disk
     failed_subjects = []
-    for subject_id, result_future in zip(subject_ids, extraction_results):
+    # strict: .map() returns exactly one future per subject. If that ever stops
+    # holding, silently truncating to the shorter list would drop subjects.
+    for subject_id, result_future in zip(subject_ids, extraction_results, strict=True):
         try:
             result = result_future.result()
 

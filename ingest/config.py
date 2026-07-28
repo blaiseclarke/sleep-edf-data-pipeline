@@ -1,6 +1,7 @@
 import os
-from dotenv import load_dotenv
 from pathlib import Path
+
+from dotenv import load_dotenv
 from mne.datasets.sleep_physionet.age import fetch_data as fetch_age_data
 from mne.datasets.sleep_physionet.temazepam import fetch_data as fetch_telemetry_data
 
@@ -14,6 +15,9 @@ RECORDING = int(os.getenv("RECORDING", 1))
 DB_PATH = os.getenv("DB_PATH", "data/sleep_data.db")
 STAGING_DIR = Path(os.getenv("STAGING_DIR", "data/staging"))
 STUDY = os.getenv("STUDY", "age").lower()  # Options: age, telemetry
+# Caps how many subjects are extracted concurrently. Each worker holds a batch
+# of epochs in memory, so this is the memory/throughput dial.
+MAX_WORKERS = max(1, int(os.getenv("PREFECT_MAX_WORKERS", 3)))
 
 # Shared mapping
 SLEEP_STAGE_MAP = {

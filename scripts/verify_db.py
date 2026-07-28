@@ -1,5 +1,6 @@
-import duckdb
 import os
+
+import duckdb
 
 from ingest.config import DB_PATH
 

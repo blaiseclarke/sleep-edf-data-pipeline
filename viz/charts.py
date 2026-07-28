@@ -5,7 +5,6 @@ rendered and inspected outside the app, and unit-tested.
 
 import pandas as pd
 import plotly.graph_objects as go
-
 from theme import PATTERNS, ink_on, style_axes
 
 STAGE_ORDER = ["W", "REM", "N1", "N2", "N3"]

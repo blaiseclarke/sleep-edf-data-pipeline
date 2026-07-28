@@ -29,6 +29,47 @@ jobs:
         ruff check .
         ruff format --check .
 
-    - name: Run Unit Tests
+    - name: Run unit tests
+      env:
+        PREFECT_API_URL: ""
       run: |
-        python -m pytest tests/
+        python -m pytest tests/ \
+          --cov=ingest --cov=warehouse --cov=viz --cov=pipeline --cov=validators \
+          --cov-report=term-missing --cov-report=xml
+
+    # Builds every dbt model and runs every dbt test against synthetic data, so
+    # a broken model is caught here rather than on the next real pipeline run.
+    # The seed deliberately contains a daytime nap, which is what the
+    # sleep-period detection has to exclude.
+    - name: Build dbt models against seeded DuckDB
+      env:
+        WAREHOUSE_TYPE: duckdb
+        DB_PATH: ci_warehouse/sleep_data.db
+      run: |
+        dbt deps --profiles-dir .
+        PYTHONPATH=. python scripts/seed_dev_data.py --subjects 3
+        dbt build --profiles-dir . --target dev_duckdb
+
+    - name: Upload coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage
+        path: coverage.xml
+        if-no-files-found: warn
+
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    # The image is a documented way to run the pipeline, so a Dockerfile that
+    # no longer builds should fail CI rather than surface at `docker compose up`.
+    - name: Build the pipeline image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        push: false
+        tags: sleep-edf-pipeline:ci
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

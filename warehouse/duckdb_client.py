@@ -1,6 +1,7 @@
 import os
+
 import duckdb
-from typing import Optional
+
 from warehouse.base import WarehouseClient
 
 
@@ -9,7 +10,7 @@ class DuckDBClient(WarehouseClient):
     DuckDB implementation of the WarehouseClient for local persistent storage.
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: str | None = None):
         if db_path is None:
             from ingest.config import DB_PATH
 
@@ -116,7 +117,7 @@ class DuckDBClient(WarehouseClient):
         subject_id: int,
         error_type: str,
         error_message: str,
-        stack_trace: Optional[str] = None,
+        stack_trace: str | None = None,
     ) -> None:
         """
         Logs an ingestion error into the INGESTION_ERRORS table.

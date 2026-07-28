@@ -1,8 +1,10 @@
 import re
-import pytest
-import pandas as pd
-import duckdb
 from unittest.mock import MagicMock, patch
+
+import duckdb
+import pandas as pd
+import pytest
+
 from warehouse.duckdb_client import DuckDBClient
 
 SNOWFLAKE_ENV = {
@@ -136,7 +138,9 @@ def test_load_epochs_rollback_on_failure(duckdb_client, staging_with_data, tmp_p
     bad_staging.mkdir()
     (bad_staging / "part_0.parquet").write_text("not a parquet file")
 
-    with pytest.raises(Exception):
+    # Narrow rather than bare Exception: a blind assert would also pass if the
+    # client raised something unrelated and never reached the transaction.
+    with pytest.raises(duckdb.Error):
         duckdb_client.load_epochs(str(bad_staging), subject_id=1, overwrite=True)
 
     # Original data should still be intact due to transaction rollback
@@ -190,7 +194,9 @@ def test_snowflake_ensure_tables_exist_creates_both_tables(snowflake_client):
 
     statements = _executed(cursor)
     assert len(statements) == 2
-    for statement, table in zip(statements, ["SLEEP_EPOCHS", "INGESTION_ERRORS"]):
+    for statement, table in zip(
+        statements, ["SLEEP_EPOCHS", "INGESTION_ERRORS"], strict=True
+    ):
         assert f"CREATE TABLE IF NOT EXISTS {table}" in statement
 
     # Idempotent, so re-running setup must never drop anything
@@ -212,7 +218,7 @@ def test_snowflake_schema_matches_duckdb(snowflake_client, tmp_path):
     snowflake_ddl = {
         table: _columns_in_ddl(statement)
         for table, statement in zip(
-            ["SLEEP_EPOCHS", "INGESTION_ERRORS"], _executed(cursor)
+            ["SLEEP_EPOCHS", "INGESTION_ERRORS"], _executed(cursor), strict=True
         )
     }
 

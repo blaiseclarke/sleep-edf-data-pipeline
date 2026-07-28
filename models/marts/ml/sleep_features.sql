@@ -1,8 +1,8 @@
 with
-    metrics as (
-        select * from {{ ref("sleep_metrics")}}
-        where sleep_stage in ('W', 'N1', 'N2', 'N3', 'REM')
-    ),
+    -- No stage filter needed: MOVE and unscored epochs are dropped during
+    -- ingestion and rejected by the Pandera contract, and schema.yml asserts
+    -- that staging only ever carries the five real stages.
+    metrics as (select * from {{ ref("sleep_metrics") }}),
 
     -- Calculate biomarker ratios
     power_ratios as (

@@ -1,9 +1,10 @@
 import logging
-from typing import Dict, Generator, List, cast
-import numpy.typing as npt
+from collections.abc import Generator
+from typing import cast
 
 import mne
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 from ingest.config import SLEEP_STAGE_MAP
@@ -124,9 +125,9 @@ def _features_to_dataframe(
     psd: npt.NDArray[np.float64],
     freqs: npt.NDArray[np.float64],
     epochs: mne.Epochs,
-    ch_names: List[str],
+    ch_names: list[str],
     subject_id: int,
-    event_id: Dict[str, int],
+    event_id: dict[str, int],
     start_index: int,
 ) -> pd.DataFrame:
     df = pd.DataFrame()
@@ -185,7 +186,7 @@ def _features_to_dataframe(
 def calculate_band_power(
     psd: npt.NDArray[np.float64],
     freqs: npt.NDArray[np.float64],
-    ch_names: List[str],
+    ch_names: list[str],
     fmin: float,
     fmax: float,
 ) -> npt.NDArray[np.float64]:
