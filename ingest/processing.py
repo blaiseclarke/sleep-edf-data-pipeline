@@ -32,6 +32,24 @@ def batch_process_file(
     actual_map = {k: v for k, v in mapping.items() if k in raw.ch_names}
     raw.rename_channels(actual_map)
 
+    # The EDF reader labels every channel in these files as EEG, respiration
+    # and rectal temperature included. Correcting the types lets MNE select
+    # real EEG for the spectral work instead of relying on name matching.
+    channel_types = {
+        "EOG": "eog",
+        "EMG": "emg",
+        "Resp oro-nasal": "resp",
+        "Temp rectal": "temperature",
+        "Event marker": "misc",
+    }
+    # Retyping temperature and the event marker moves them off volts, which is
+    # the point rather than a problem, so don't warn once per subject about it.
+    raw.set_channel_types(
+        {k: v for k, v in channel_types.items() if k in raw.ch_names},
+        on_unit_change="ignore",
+        verbose=False,
+    )
+
     # Load annotations
     annotations = mne.read_annotations(hypno_path)
     raw.set_annotations(annotations, emit_warning=False)
@@ -55,6 +73,18 @@ def batch_process_file(
 
     total_epochs = len(events)
 
+    # Only EEG carries the band power we extract, so restrict the PSD to it
+    # rather than transforming all seven channels and discarding five.
+    if len(mne.pick_types(raw.info, eeg=True)) > 0:
+        psd_picks = "eeg"
+    else:
+        # Fall back to every data channel rather than failing outright
+        logger.warning(
+            "Subject %d: no EEG channels found, computing power across all channels",
+            subject_id,
+        )
+        psd_picks = None
+
     # Generator loop
     for start_idx in range(0, total_epochs, batch_size):
         end_idx = min(start_idx + batch_size, total_epochs)
@@ -69,15 +99,19 @@ def batch_process_file(
             method="welch",
             fmin=0.5,  # type: ignore
             fmax=30.0,
+            picks=psd_picks,
             verbose=False,
         )
         psd, freqs = spectrum.get_data(return_freqs=True)
 
         # Format
+        # Channel names come from the spectrum, not the epochs, so that they
+        # always line up with the channel axis of `psd`
         df_batch = _features_to_dataframe(
             psd=psd,
             freqs=freqs,
             epochs=batch_epochs,
+            ch_names=spectrum.ch_names,
             subject_id=subject_id,
             event_id=event_id,
             start_index=start_idx,
@@ -90,6 +124,7 @@ def _features_to_dataframe(
     psd: npt.NDArray[np.float64],
     freqs: npt.NDArray[np.float64],
     epochs: mne.Epochs,
+    ch_names: List[str],
     subject_id: int,
     event_id: Dict[str, int],
     start_index: int,
@@ -112,7 +147,6 @@ def _features_to_dataframe(
     df["stage"] = df["sleep_stage_label"].apply(lambda x: SLEEP_STAGE_MAP.get(x, "NAN"))
 
     # Power calculation
-    ch_names = epochs.info["ch_names"]
     df["delta_power"] = calculate_band_power(psd, freqs, ch_names, 0.5, 4)
     df["theta_power"] = calculate_band_power(psd, freqs, ch_names, 4, 8)
     df["alpha_power"] = calculate_band_power(psd, freqs, ch_names, 8, 12)
@@ -156,7 +190,10 @@ def calculate_band_power(
     fmax: float,
 ) -> npt.NDArray[np.float64]:
     # Filter channels (EEG only)
-    # Look for "EEG" in the name ("EEG Fpz-Cz", "EEG Pz-Oz")
+    # Look for "EEG" in the name ("EEG Fpz-Cz", "EEG Pz-Oz"). `ch_names` must
+    # describe the channel axis of `psd`. The caller normally picks EEG before
+    # computing the PSD, so this is a no-op guard on that path and does the real
+    # selecting only when the pick fell back to all channels.
     eeg_indices = [i for i, name in enumerate(ch_names) if "EEG" in name]
 
     if not eeg_indices:

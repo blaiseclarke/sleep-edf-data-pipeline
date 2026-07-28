@@ -170,7 +170,7 @@ python pipeline.py # Also executes target-specific dbt models
 #### 1. Extraction (Python/MNE)
 Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. This handles the heavy lifting of signal processing before data ever hits the warehouse.
 
-* **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands. 
+* **Spectral Analysis:** Extracts Power Spectral Density (PSD) for delta, theta, alpha, sigma, and beta bands. Channel types are corrected on load — the EDF reader labels every channel in these files as EEG, respiration and rectal temperature included — so the Welch transform runs over EEG alone rather than all seven channels.
 * **Standardization:** Maps raw annotations to clinical sleep stages (`W, N1, N2, N3, REM`). Movement and unscored epochs (`MOVE`, `NAN`) are filtered out before validation.
 * **Memory Efficiency:** Utilizes `preload=False` (memory mapping) to handle large EEG files with minimal RAM impact.
 * **Configurable Parameters:** The pipeline range and logic are controlled via environment variables:
