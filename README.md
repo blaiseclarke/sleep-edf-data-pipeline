@@ -66,7 +66,7 @@ Docker Compose is recommended for reproducible execution.
 - Docker *(Docker Desktop recommended)*
 - Snowflake account *(optional, DuckDB used by default for local)*
 - `make` *(for automation)*
-- dbt-core (pip install dbt-snowflake or dbt-duckdb)
+- dbt adapters — both `dbt-duckdb` and `dbt-snowflake` are in `requirements.txt`
 
 #### Configuration
 
@@ -181,9 +181,22 @@ Built using `mne` for polysomnograph (PSG) ingestion and annotation alignment. T
     * `STUDY`: Selects the Sleep-EDF study (options: `age`, `telemetry`, default: `age`).
 
 #### 2. Warehousing (DuckDB / Snowflake)
-The pipeline is warehouse-agnostic via the `WarehouseClient` protocol.
+The pipeline is warehouse-agnostic via the `WarehouseClient` protocol, which covers table creation (`ensure_tables_exist`), loading (`load_epochs`), and error logging (`log_ingestion_error`).
 * **DuckDB (Local):** Default for local development. Data is persisted to `data/sleep_data.db` without cloud overhead.
-* **Snowflake (Cloud):** Used for production-scale storage and analytics, separating compute from storage.
+* **Snowflake (Cloud):** Used for production-scale storage and analytics, separating compute from storage. Loads go through an internal stage with `PUT` followed by `COPY INTO`.
+
+Both backends declare `SLEEP_EPOCHS` and `INGESTION_ERRORS` with identical column names, and a test asserts the two schemas cannot drift apart. Table creation is idempotent and runs automatically at the start of the flow, so no manual DDL is needed on either warehouse — `scripts/setup_db.py` remains available to do it as a separate step. The Snowflake role needs `CREATE TABLE` on the target schema.
+
+**Running against Snowflake:**
+
+```bash
+# Set WAREHOUSE_TYPE=snowflake plus the SNOWFLAKE_* variables in .env, then
+export $(grep -v '^#' .env | xargs)   # dbt does not read .env itself
+python scripts/setup_db.py            # optional; the pipeline also does this
+python pipeline.py
+```
+
+Set `DBT_SOURCE_DATABASE` and `DBT_SOURCE_SCHEMA` to match `SNOWFLAKE_DATABASE` and `SNOWFLAKE_SCHEMA` so the dbt models read from the table the loader wrote to.
 
 #### 3. Transformation (dbt)
 The dbt project creates a trusted data lineage, transforming raw logs into analytics-ready models:
