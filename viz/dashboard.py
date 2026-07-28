@@ -1,193 +1,289 @@
-import streamlit as st
-import duckdb
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import os
 
-# Configuration
-st.set_page_config(page_title="Sleep Data Viewer", layout="wide")
+import duckdb
+import pandas as pd
+import streamlit as st
+
+# Sibling modules: Streamlit puts the script's own directory on sys.path, so these
+# resolve both under `streamlit run viz/dashboard.py` and `python viz/dashboard.py`.
+from charts import BANDS, architecture_figure, band_power_figure, hypnogram_figure
+from theme import PLOTLY_CONFIG, palette
 
 DB_PATH = os.getenv("DB_PATH", "data/sleep_data.db")
 
 
-# Data loading
+st.set_page_config(
+    page_title="Sleep-EDF",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+
+def active_theme() -> str:
+    """
+    The viewer's light/dark choice. Available from Streamlit 1.52; anything older
+    falls back to light rather than raising.
+    """
+    try:
+        return "dark" if st.context.theme.get("type") == "dark" else "light"
+    except Exception:
+        return "light"
+
+
+MODE = active_theme()
+COLOURS = palette(MODE)
+
+# Typography and chrome. Numerals are monospaced and tabular so figures line up
+# and digits do not jitter between subjects. Focus rings are restored at high
+# contrast because the default is easy to lose against this surface.
+st.markdown(
+    f"""
+    <style>
+      :root {{
+        --ink-muted: {COLOURS["ink_muted"]};
+        --rule: {COLOURS["grid"]};
+        --accent: {COLOURS["series"]};
+      }}
+      [data-testid="stMetricValue"], [data-testid="stMetricLabel"] {{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas,
+                     "Liberation Mono", monospace;
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: "tnum";
+      }}
+      [data-testid="stMetricValue"] {{ font-size: 1.45rem; font-weight: 600; }}
+      [data-testid="stMetricLabel"] p {{
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+      }}
+      .sleep-rule {{
+        border-top: 1px solid var(--rule);
+        margin: 1.4rem 0 0.5rem;
+      }}
+      .sleep-section {{
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+        margin: 0 0 0.15rem;
+      }}
+      /* Keyboard focus must stay obvious on every interactive element. */
+      *:focus-visible {{
+        outline: 2px solid var(--accent) !important;
+        outline-offset: 2px !important;
+      }}
+      @media (prefers-reduced-motion: reduce) {{
+        *, *::before, *::after {{
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }}
+      }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+
 @st.cache_data
 def get_subjects():
-    """Fetch list of available subjects from the summary mart."""
-    con = duckdb.connect(DB_PATH, read_only=True)
+    """Available subjects, ordered numerically."""
+    connection = duckdb.connect(DB_PATH, read_only=True)
     try:
-        df = con.execute(
+        frame = connection.execute(
             "SELECT subject_id FROM sleep_summary ORDER BY subject_id"
         ).df()
-        return df["subject_id"].tolist()
+        return frame["subject_id"].tolist()
     except duckdb.CatalogException:
-        st.error("dbt models not found. Run `dbt run` first.")
+        st.error("dbt models not found. Run `dbt build` first.")
         return []
     finally:
-        con.close()
+        connection.close()
 
 
 @st.cache_data
 def load_analysis_data(subject_id):
-    """
-    Fetch data from dbt models:
-    1. Summary Metrics
-    2. Epoch Metrics
-    """
-    con = duckdb.connect(DB_PATH, read_only=True)
-
-    # Get high-level summary
-    summary_query = """
-        SELECT * 
-        FROM sleep_summary 
-        WHERE subject_id = ?
-    """
-    summary_df = con.execute(summary_query, [subject_id]).df()
-
-    # Get epoch data
-    epoch_query = """
-        SELECT
-            epoch_idx,
-            sleep_stage,
-            is_stage_transition,
-            is_in_sleep_period
-        FROM sleep_metrics
-        WHERE subject_id = ?
-        ORDER BY epoch_idx
-    """
-    epoch_df = con.execute(epoch_query, [subject_id]).df()
-
-    con.close()
-    return summary_df, epoch_df
+    """Summary row and per-epoch rows for one subject."""
+    connection = duckdb.connect(DB_PATH, read_only=True)
+    try:
+        summary = connection.execute(
+            "SELECT * FROM sleep_summary WHERE subject_id = ?", [subject_id]
+        ).df()
+        epochs = connection.execute(
+            """
+            SELECT
+                epoch_idx,
+                sleep_stage,
+                is_stage_transition,
+                is_in_sleep_period
+            FROM sleep_metrics
+            WHERE subject_id = ?
+            ORDER BY epoch_idx
+            """,
+            [subject_id],
+        ).df()
+        return summary, epochs
+    finally:
+        connection.close()
 
 
-st.title("Sleep-EDF Data Viewer")
+def section(title: str, description: str) -> None:
+    """A hairline rule, a small-caps heading, and a plain-language summary."""
+    st.markdown('<div class="sleep-rule"></div>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sleep-section">{title}</p>', unsafe_allow_html=True)
+    st.markdown(f"##### {description}")
 
-# Sidebar
+
+st.markdown("### Sleep-EDF")
+st.caption(
+    "Sleep architecture from overnight polysomnography, PhysioNet Sleep-EDF age "
+    "study. Reads the dbt marts directly from DuckDB."
+)
+
 subject_list = get_subjects()
-
 if not subject_list:
-    st.warning("No subjects found in analytics tables.")
+    st.warning("No subjects found in the analytics tables.")
     st.stop()
 
-selected_subject = st.sidebar.selectbox("Subject ID", subject_list)
+selected_subject = st.sidebar.selectbox(
+    "Subject", subject_list, help="Each subject is one overnight recording."
+)
+high_contrast = st.sidebar.toggle(
+    "Pattern fills",
+    value=False,
+    help=(
+        "Adds a hatch to each segment of the sleep architecture bar, so the three "
+        "parts stay distinguishable without relying on colour."
+    ),
+)
+st.sidebar.caption(f"Theme: {MODE}. Charts follow your light/dark setting.")
 
-# Load data
 summary_row, epoch_df = load_analysis_data(selected_subject)
-
 if summary_row.empty:
-    st.error(f"No summary data found for Subject {selected_subject}")
+    st.error(f"No summary data for subject {selected_subject}.")
     st.stop()
 
 metrics = summary_row.iloc[0]
-
-c1, c2, c3, c4, c5, c6 = st.columns(6)
-
-c1.metric("Total Sleep Time", f"{metrics['total_sleep_minutes']:.1f} min")
-c2.metric("Sleep Efficiency", f"{metrics['sleep_efficiency'] * 100:.1f}%")
-c3.metric("Awakenings", int(metrics["number_of_awakenings"]))
-c4.metric("Deep Sleep %", f"{metrics['deep_sleep_percentage'] * 100:.1f}%")
-c5.metric("Light Sleep %", f"{metrics['light_sleep_percentage'] * 100:.1f}%")
-c6.metric("REM Sleep %", f"{metrics['rem_sleep_percentage'] * 100:.1f}%")
-
-st.caption(
-    f"Sleep period: {metrics['sleep_period_minutes']:.0f} min "
-    f"({metrics['waso_minutes']:.0f} min awake after onset) "
-    f"within a {metrics['total_recording_minutes'] / 60:.1f} h recording. "
-    "Metrics below cover the sleep period, not the full recording."
-)
-
-# Temporal analysis
-st.subheader("Sleep Staging")
-
-# Map stages to numbers for plotting
-stage_map = {"W": 0, "REM": 1, "N1": 2, "N2": 3, "N3": 4}
-
-# These are day-long ambulatory recordings, so plotting the whole thing buries
-# the night in hours of flat wakefulness. Show the sleep period instead.
-sleep_period_df = epoch_df[epoch_df["is_in_sleep_period"]].copy()
-if sleep_period_df.empty:
-    st.warning(f"No scored sleep found for Subject {selected_subject}")
+sleep_period = epoch_df[epoch_df["is_in_sleep_period"]].copy()
+if sleep_period.empty:
+    st.warning(f"No scored sleep for subject {selected_subject}.")
     st.stop()
 
-epoch_df = sleep_period_df
-epoch_df["stage_num"] = epoch_df["sleep_stage"].map(stage_map)
-# 30s epochs, measured from sleep onset
-onset_idx = epoch_df["epoch_idx"].min()
-epoch_df["time_min"] = (epoch_df["epoch_idx"] - onset_idx) * 0.5
+tiles = st.columns(6)
+tiles[0].metric("Total sleep", f"{metrics['total_sleep_minutes'] / 60:.1f} h")
+tiles[1].metric("Efficiency", f"{metrics['sleep_efficiency'] * 100:.0f}%")
+tiles[2].metric("Awakenings", f"{int(metrics['number_of_awakenings'])}")
+tiles[3].metric("Deep (N3)", f"{metrics['deep_sleep_percentage'] * 100:.0f}%")
+tiles[4].metric("Light (N1+N2)", f"{metrics['light_sleep_percentage'] * 100:.0f}%")
+tiles[5].metric("REM", f"{metrics['rem_sleep_percentage'] * 100:.0f}%")
 
-fig_hypno = go.Figure()
-fig_hypno.add_trace(
-    go.Scatter(
-        x=epoch_df["time_min"],
-        y=epoch_df["stage_num"],
-        mode="lines",
-        line_shape="hv",
-        name="Stage",
-        line=dict(color="black", width=1),
-    )
+st.caption(
+    f"Sleep period {metrics['sleep_period_minutes'] / 60:.1f} h, of which "
+    f"{metrics['waso_minutes']:.0f} min awake after onset, within a "
+    f"{metrics['total_recording_minutes'] / 60:.1f} h recording. Percentages are "
+    "shares of total sleep time."
 )
 
-fig_hypno.update_layout(
-    yaxis=dict(
-        tickmode="array",
-        tickvals=[0, 1, 2, 3, 4],
-        ticktext=["Wake", "REM", "N1", "N2", "N3"],
-        autorange="reversed",
-        showgrid=True,
-        gridcolor="lightgrey",
-    ),
-    xaxis_title="Time from Sleep Onset (Minutes)",
-    xaxis=dict(showgrid=True, gridcolor="lightgrey"),
-    plot_bgcolor="white",
-    height=300,
-    margin=dict(l=0, r=0, t=20, b=0),
+onset_idx = int(sleep_period["epoch_idx"].min())
+
+section(
+    "Hypnogram",
+    f"Subject {selected_subject} moved through "
+    f"{int(metrics['number_of_awakenings'])} awakenings across "
+    f"{metrics['sleep_period_minutes'] / 60:.1f} hours in bed.",
 )
-st.plotly_chart(fig_hypno, use_container_width=True)
-
-# Spectral analysis
-c_left, c_right = st.columns(2)
-
-with c_left:
-    st.subheader("Average Band Power (dB)")
-
-    # We query the pre-calculated averages from the Mart
-    power_data = {
-        "Delta": metrics["avg_delta_power"],
-        "Theta": metrics["avg_theta_power"],
-        "Alpha": metrics["avg_alpha_power"],
-        "Sigma": metrics["avg_sigma_power"],
-        "Beta": metrics["avg_beta_power"],
-    }
-
-    df_power = pd.DataFrame(list(power_data.items()), columns=["Band", "dB"])
-
-    fig_bar = px.bar(df_power, x="Band", y="dB", text_auto=".1f")
-    fig_bar.update_traces(marker_color="slategrey")
-    fig_bar.update_layout(
-        plot_bgcolor="white",
-        xaxis=dict(showgrid=True, gridcolor="lightgrey"),
-        yaxis=dict(showgrid=True, gridcolor="lightgrey"),
+st.plotly_chart(
+    hypnogram_figure(sleep_period, onset_idx, COLOURS),
+    config=PLOTLY_CONFIG,
+)
+with st.expander("Hypnogram as a table"):
+    st.dataframe(
+        pd.DataFrame(
+            {
+                "Minutes after onset": (sleep_period["epoch_idx"] - onset_idx) * 0.5,
+                "Stage": sleep_period["sleep_stage"],
+            }
+        ),
+        hide_index=True,
+        height=260,
     )
-    st.plotly_chart(fig_bar, use_container_width=True)
 
-with c_right:
-    st.subheader("Stage Distribution")
+left, right = st.columns(2)
 
-    # Create distribution table from summary metrics
-    dist_data = {
-        "Stage": ["Deep (N3)", "Light (N1/N2)", "REM"],
-        "Minutes": [
-            metrics["deep_sleep_minutes"],
-            metrics["light_sleep_minutes"],
-            metrics["rem_sleep_minutes"],
-        ],
-        "Percentage": [
-            f"{metrics['deep_sleep_percentage'] * 100:.1f}%",
-            f"{metrics['light_sleep_percentage'] * 100:.1f}%",
-            f"{metrics['rem_sleep_percentage'] * 100:.1f}%",
-        ],
-    }
+with left:
+    section(
+        "Sleep architecture",
+        f"{metrics['deep_sleep_percentage'] * 100:.0f}% of sleep was deep (N3).",
+    )
+    st.plotly_chart(
+        architecture_figure(metrics, high_contrast, COLOURS),
+        config=PLOTLY_CONFIG,
+    )
+    with st.expander("Architecture as a table"):
+        st.dataframe(
+            pd.DataFrame(
+                {
+                    "Stage": ["Deep (N3)", "Light (N1+N2)", "REM"],
+                    "Minutes": [
+                        round(metrics["deep_sleep_minutes"]),
+                        round(metrics["light_sleep_minutes"]),
+                        round(metrics["rem_sleep_minutes"]),
+                    ],
+                    "Share of sleep": [
+                        f"{metrics['deep_sleep_percentage'] * 100:.1f}%",
+                        f"{metrics['light_sleep_percentage'] * 100:.1f}%",
+                        f"{metrics['rem_sleep_percentage'] * 100:.1f}%",
+                    ],
+                }
+            ),
+            hide_index=True,
+        )
 
-    st.dataframe(pd.DataFrame(dist_data), use_container_width=True, hide_index=True)
+with right:
+    strongest = max(BANDS, key=lambda band: float(metrics[band[1]]))
+    section(
+        "Spectral power",
+        f"{strongest[0]} ({strongest[2]}) dominates at "
+        f"{float(metrics[strongest[1]]):.1f} dB.",
+    )
+    st.plotly_chart(band_power_figure(metrics, COLOURS), config=PLOTLY_CONFIG)
+    with st.expander("Spectral power as a table"):
+        st.dataframe(
+            pd.DataFrame(
+                {
+                    "Band": [name for name, _, _ in BANDS],
+                    "Range": [span for _, _, span in BANDS],
+                    "Mean power (dB)": [
+                        round(float(metrics[column]), 2) for _, column, _ in BANDS
+                    ],
+                }
+            ),
+            hide_index=True,
+        )
+
+st.markdown('<div class="sleep-rule"></div>', unsafe_allow_html=True)
+with st.expander("How these numbers are derived"):
+    st.markdown(
+        """
+Sleep-EDF recordings run for roughly 22 hours and span an entire day, and many
+subjects nap. Aggregating over the whole recording therefore describes the day
+rather than the night: it reports 22 hours of "time in bed", counts every
+afternoon transition into wake as an awakening, and averages band power across
+hours of ordinary wakefulness.
+
+Each recording is split into sleep episodes wherever a continuous wake bout runs
+longer than 60 minutes, and the episode containing the most sleep is kept. Every
+metric above except the recording length is scoped to that window. The dataset
+carries no lights-off annotation, so this window is the closest available proxy
+for time in bed, and sleep onset latency is deliberately not reported: measured
+from the start of a recording that begins mid-afternoon, it would be meaningless.
+
+Power is the mean of a Welch periodogram over the two EEG derivations, in
+decibels, so negative values are ordinary in the faster bands.
+
+Every chart has a table view, colour is never the only channel carrying meaning,
+and the palettes are checked against colour-vision-deficiency simulation in both
+light and dark modes rather than picked by eye.
+        """
+    )
