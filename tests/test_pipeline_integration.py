@@ -13,9 +13,10 @@ def integration_db(tmp_path, monkeypatch):
     """
     db_file = str(tmp_path / "integration_sleep.db")
 
-    # Patch the source of truth for DB_PATH
+    # Patch the source of truth for DB_PATH. setup_database() now goes through
+    # the warehouse factory, and DuckDBClient reads this at construction time.
     monkeypatch.setattr("ingest.config.DB_PATH", db_file)
-    monkeypatch.setattr("scripts.setup_db.DB_PATH", db_file)
+    monkeypatch.setenv("WAREHOUSE_TYPE", "duckdb")
 
     # Initialize the schema in the fresh database
     setup_database()

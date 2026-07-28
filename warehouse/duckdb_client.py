@@ -21,10 +21,11 @@ class DuckDBClient(WarehouseClient):
         if self.db_path and os.path.dirname(self.db_path):
             os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
-        # Initialize tables if they don't exist
-        self._ensure_tables_exist()
+        # Initialize tables if they don't exist. Cheap for a local file, so it
+        # runs on construction; the Snowflake client leaves DDL to setup_db.py.
+        self.ensure_tables_exist()
 
-    def _ensure_tables_exist(self):
+    def ensure_tables_exist(self) -> None:
         """Creates required tables if they don't exist."""
         connection = duckdb.connect(self.db_path)
         try:

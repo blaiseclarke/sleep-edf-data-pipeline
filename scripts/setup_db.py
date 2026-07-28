@@ -1,9 +1,7 @@
-import os
 import logging
-import duckdb
+import os
 
-from ingest.config import DB_PATH
-
+from warehouse.factory import get_warehouse_client
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -11,56 +9,22 @@ logger = logging.getLogger(__name__)
 
 def setup_database():
     """
-    Initializes the DuckDB database and creates the necessary tables.
+    Creates the tables the pipeline writes to, in whichever warehouse
+    WAREHOUSE_TYPE selects.
+
+    The DDL lives on the clients rather than here, so that DuckDB and Snowflake
+    cannot drift apart and so that this script stays a thin entry point.
     """
-    # Create directory if it doesn't exist
-    db_dir = os.path.dirname(DB_PATH)
-    if db_dir and not os.path.exists(db_dir):
-        logger.info(f"Creating database directory: {db_dir}")
-        os.makedirs(db_dir, exist_ok=True)
+    warehouse_type = os.getenv("WAREHOUSE_TYPE", "duckdb").lower()
 
-    connection = duckdb.connect(DB_PATH)
+    logger.info("Setting up %s tables...", warehouse_type)
 
-    try:
-        # Creates SLEEP_EPOCHS table
-        # Main table storing calculated power spectral density
-        # and sleep stages for every 30-second epoch
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS SLEEP_EPOCHS (
-                SUBJECT_ID INTEGER,
-                EPOCH_IDX INTEGER,
-                STAGE VARCHAR,
-                DELTA_POWER DOUBLE,
-                THETA_POWER DOUBLE,
-                ALPHA_POWER DOUBLE,
-                SIGMA_POWER DOUBLE,
-                BETA_POWER DOUBLE,
-                LOAD_TIMESTAMP TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
+    # DuckDB creates its parent directory and its tables on construction;
+    # Snowflake needs the explicit call below.
+    client = get_warehouse_client()
+    client.ensure_tables_exist()
 
-        # Creates INGESTION_ERRORS table
-        # Logs failures here to enable debugging specific subject issues
-        # without halting the entire pipeline execution
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS INGESTION_ERRORS (
-                ERROR_ID UUID DEFAULT uuid(),
-                SUBJECT_ID INTEGER,
-                ERROR_TYPE VARCHAR,
-                ERROR_MESSAGE VARCHAR,
-                STACK_TRACE VARCHAR,
-                OCCURRED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-
-        logger.info("DuckDB database setup successfully.")
-
-    finally:
-        connection.close()
+    logger.info("%s setup completed successfully.", warehouse_type.capitalize())
 
 
 if __name__ == "__main__":

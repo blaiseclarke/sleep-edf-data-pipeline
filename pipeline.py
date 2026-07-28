@@ -158,6 +158,12 @@ def run_ingestion_pipeline():
 
     warehouse_client = get_warehouse_client()
 
+    # `docker compose up` and `python pipeline.py` both run the flow without a
+    # separate setup step, so create the tables here. Idempotent on either
+    # warehouse; scripts/setup_db.py remains available to run it on its own.
+    logger.info("Ensuring warehouse tables exist...")
+    warehouse_client.ensure_tables_exist()
+
     subject_ids = list(range(STARTING_SUBJECT, ENDING_SUBJECT + 1))
 
     # Download data
