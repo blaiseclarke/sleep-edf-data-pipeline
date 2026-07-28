@@ -151,6 +151,29 @@ def test_load_epochs_rollback_on_failure(duckdb_client, staging_with_data, tmp_p
     assert result[0] == 2
 
 
+def test_clear_epochs_empties_the_table(duckdb_client, staging_with_data):
+    """The seed script relies on this to leave exactly its synthetic rows."""
+    duckdb_client.load_epochs(staging_with_data, subject_id=1)
+    duckdb_client.clear_epochs()
+
+    conn = duckdb.connect(duckdb_client.db_path)
+    result = conn.execute("SELECT COUNT(*) FROM SLEEP_EPOCHS").fetchone()
+    conn.close()
+
+    assert result[0] == 0
+
+
+def test_snowflake_clear_epochs_deletes_all_rows(snowflake_client):
+    """Same clear semantics as DuckDB, so the seed behaves identically on either warehouse."""
+    client, cursor, connection = snowflake_client
+
+    client.clear_epochs()
+
+    assert _executed(cursor) == ["DELETE FROM SLEEP_EPOCHS"]
+    cursor.close.assert_called_once()
+    connection.close.assert_called_once()
+
+
 def test_log_ingestion_error(duckdb_client):
     """Verifies that ingestion errors are logged correctly."""
     duckdb_client.log_ingestion_error(

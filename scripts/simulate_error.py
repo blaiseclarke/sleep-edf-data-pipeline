@@ -8,29 +8,10 @@ import duckdb
 from prefect import flow
 
 from ingest.config import DB_PATH
-from pipeline import extract_to_parquet
+from pipeline import describe_error, extract_to_parquet
 from warehouse.factory import get_warehouse_client
 
 MISSING_SUBJECT = 999
-
-
-def describe_error(error):
-    """
-    Normalise the two shapes extract_to_parquet reports failures in.
-
-    A schema violation returns {"type": ..., "message": ...}, but the
-    missing-file path returns a bare string -- which is the shape this script
-    always hits, since subject 999 does not exist. Indexing it as a dict raised
-    TypeError before the error was ever written, so the script meant to prove
-    error logging works proved nothing.
-    """
-    if isinstance(error, dict):
-        return (
-            error.get("type", "ExtractionFailed"),
-            error.get("message", ""),
-            error.get("stack_trace"),
-        )
-    return "ExtractionFailed", str(error), None
 
 
 @flow

@@ -1,5 +1,8 @@
 sleep_analytics:
-  target: dev
+  # DuckDB is the default so the documented local flow (`dbt debug/build
+  # --profiles-dir .` against a stock .env) works out of the box. The pipeline
+  # and CI always pass an explicit --target; use `--target dev` for Snowflake.
+  target: dev_duckdb
   outputs:
     dev:
       type: snowflake

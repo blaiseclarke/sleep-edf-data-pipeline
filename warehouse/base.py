@@ -21,6 +21,13 @@ class WarehouseClient(Protocol):
         """Saves a batch of sleep data to the database from a Parquet directory."""
         ...
 
+    def clear_epochs(self) -> None:
+        """
+        Deletes every row from SLEEP_EPOCHS. The dev-seed script uses this so
+        the table holds exactly its synthetic data on either warehouse.
+        """
+        ...
+
     def log_ingestion_error(
         self,
         subject_id: int,

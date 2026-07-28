@@ -52,6 +52,18 @@ def test_every_in_segment_label_clears_contrast(mode):
         assert contrast(ink_on(fill), fill) >= 3.0
 
 
+def test_in_segment_labels_are_wcag_large_text(metrics):
+    """
+    The 3:1 floor above only holds while the labels qualify as WCAG large text.
+    They once claimed 19px bold but rendered 19px regular: at normal-text size
+    the blue slot's 4.46:1 fails the 4.5:1 AA floor this test suite waived.
+    Plotly fonts carry no weight property, so the bold must come from markup.
+    """
+    for trace in architecture_figure(metrics, textured=False, colours=LIGHT).data:
+        assert trace.insidetextfont.size == 19
+        assert trace.text[0].startswith("<b>") and trace.text[0].endswith("</b>")
+
+
 @pytest.mark.parametrize("mode", ["light", "dark"])
 def test_body_text_clears_aa_against_the_surface(mode):
     colours = palette(mode)

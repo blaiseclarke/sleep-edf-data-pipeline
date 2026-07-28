@@ -159,6 +159,16 @@ class SnowflakeClient(WarehouseClient):
             cursor.close()
             conn.close()
 
+    def clear_epochs(self) -> None:
+        """Deletes every row from SLEEP_EPOCHS."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("DELETE FROM SLEEP_EPOCHS")
+        finally:
+            cursor.close()
+            conn.close()
+
     def log_ingestion_error(
         self,
         subject_id: int,
