@@ -49,6 +49,48 @@ class SnowflakeClient(WarehouseClient):
             role=self.role,
         )
 
+    def ensure_tables_exist(self) -> None:
+        """
+        Creates SLEEP_EPOCHS and INGESTION_ERRORS in the configured database and
+        schema if they are not already there.
+
+        Unlike the DuckDB client this is not called from __init__, since opening
+        a connection should not imply issuing DDL. The pipeline flow and
+        scripts/setup_db.py both call it explicitly. Requires a role with
+        CREATE TABLE on the target schema.
+        """
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        try:
+            # FLOAT is Snowflake's 64-bit double, matching DuckDB's DOUBLE
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS SLEEP_EPOCHS (
+                    SUBJECT_ID INTEGER,
+                    EPOCH_IDX INTEGER,
+                    STAGE VARCHAR,
+                    DELTA_POWER FLOAT,
+                    THETA_POWER FLOAT,
+                    ALPHA_POWER FLOAT,
+                    SIGMA_POWER FLOAT,
+                    BETA_POWER FLOAT,
+                    LOAD_TIMESTAMP TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS INGESTION_ERRORS (
+                    ERROR_ID VARCHAR(36) DEFAULT UUID_STRING(),
+                    SUBJECT_ID INTEGER,
+                    ERROR_TYPE VARCHAR,
+                    ERROR_MESSAGE VARCHAR,
+                    STACK_TRACE VARCHAR,
+                    OCCURRED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
+                )
+            """)
+        finally:
+            cursor.close()
+            conn.close()
+
     def load_epochs(
         self, staging_path: str, subject_id: int, overwrite: bool = True
     ) -> None:
