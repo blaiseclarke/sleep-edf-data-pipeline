@@ -196,3 +196,24 @@ def test_flow_bounds_its_task_runner():
     runner = pipeline.run_ingestion_pipeline.task_runner
     assert isinstance(runner, ThreadPoolTaskRunner)
     assert runner._max_workers == MAX_WORKERS
+
+
+def test_describe_error_handles_both_failure_shapes():
+    """
+    extract_to_parquet reports schema violations as a dict but missing files as
+    a bare string. simulate_error.py indexed the string as a dict and raised
+    TypeError before writing anything, so the script that exists to prove error
+    logging works proved nothing.
+    """
+    from scripts.simulate_error import describe_error
+
+    assert describe_error("No files found") == (
+        "ExtractionFailed",
+        "No files found",
+        None,
+    )
+    assert describe_error(
+        {"type": "SchemaError", "message": "bad row", "stack_trace": "trace"}
+    ) == ("SchemaError", "bad row", "trace")
+    # A dict missing the optional keys must not raise.
+    assert describe_error({"message": "partial"})[0] == "ExtractionFailed"

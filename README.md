@@ -109,7 +109,19 @@ DB_PATH=data/sleep_data.db
 # DBT_SOURCE_SCHEMA=RAW
 ```
 
-**2. Environment Loading**
+**2. Prefect profile**
+
+A fresh Prefect install runs flows in ephemeral mode, so `python pipeline.py` works with no setup. If you have previously pointed Prefect at a local server, the active profile will hold a `PREFECT_API_URL` and the run fails with *"No Prefect API URL provided"* or *"Failed to reach API"* unless that server is up. Either start one, or run against the ephemeral profile:
+
+```bash
+prefect profile ls                  # which profile is active
+prefect server start                # option A: run the server (gives you the UI)
+PREFECT_PROFILE=ephemeral make run  # option B: no server, no UI
+```
+
+Note that `PREFECT_API_URL=""` does **not** work — Prefect reads an empty string as "not provided" rather than as a request for ephemeral mode.
+
+**3. Environment Loading**
 
 *   **Docker:** Automatically reads `.env`.
 *   **Python (Local):** Automatically reads `.env` (via `python-dotenv`).
@@ -117,9 +129,10 @@ DB_PATH=data/sleep_data.db
     ```bash
     # Export variables from .env
     export $(grep -v '^#' .env | xargs)
-    
-    # Run dbt
-    dbt debug
+
+    # Run dbt. profiles.yml lives in the repo root rather than ~/.dbt,
+    # so every dbt command needs --profiles-dir .
+    dbt debug --profiles-dir .
     ```
 
 #### Option 1: Docker Compose
@@ -131,7 +144,11 @@ Runs the pipeline locally inside a Docker container.
 git clone https://github.com/blaiseclarke/sleep-edf-data-pipeline.git
 cd sleep-edf-data-pipeline
 
-# 2. Build and run (uses .env automatically)
+# 2. Create the env file. Compose declares `env_file: .env`, so it fails
+#    outright if this is missing.
+cp .env.example .env
+
+# 3. Build and run
 docker compose up --build
 
 # Note: Prefect automatically kicks off `dbt deps` and `dbt build` against the target warehouse after successful ingestion
@@ -175,14 +192,17 @@ PYTHONPATH=. python scripts/simulate_error.py  # Verifies failures reach INGESTI
 #### Option 3: Manual Python Execution
 
 ```bash
-# Install dependencies manually
+# 1. Install dependencies manually
 pip install -r requirements.txt
+cp .env.example .env
 
-# 2. Initialize local database
-python scripts/setup_db.py
+# 2. Initialize the local database. Scripts under scripts/ import from the
+#    project root, so they need PYTHONPATH=. ; `make setup-db` sets it for you.
+PYTHONPATH=. python scripts/setup_db.py
 
-# 3. Run ingestion pipeline directly
-python pipeline.py # Also executes target-specific dbt models
+# 3. Run the ingestion pipeline directly. pipeline.py sits in the root, so it
+#    needs no PYTHONPATH, and it creates the warehouse tables itself.
+python pipeline.py  # Also executes the dbt models for the selected target
 ```
 
 
@@ -214,8 +234,8 @@ Both backends declare `SLEEP_EPOCHS` and `INGESTION_ERRORS` with identical colum
 
 ```bash
 # Set WAREHOUSE_TYPE=snowflake plus the SNOWFLAKE_* variables in .env, then
-export $(grep -v '^#' .env | xargs)   # dbt does not read .env itself
-python scripts/setup_db.py            # optional; the pipeline also does this
+export $(grep -v '^#' .env | xargs)              # dbt does not read .env itself
+PYTHONPATH=. python scripts/setup_db.py          # optional; the pipeline also does this
 python pipeline.py
 ```
 
