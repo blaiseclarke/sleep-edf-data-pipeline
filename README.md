@@ -120,7 +120,7 @@ cd sleep-edf-data-pipeline
 # 2. Build and run (uses .env automatically)
 docker compose up --build
 
-# Note: Prefect automatically kicks off `dbt deps`, `dbt run`, and `dbt test` against the target warehouse after successful ingestion
+# Note: Prefect automatically kicks off `dbt deps` and `dbt build` against the target warehouse after successful ingestion
 ```
 #### Option 2: Local Development (Makefile)
 
@@ -221,6 +221,7 @@ Reliability is enforced through automated checks and failure logging:
 * **Validation (Pandera):** Sleep stages and spectral powers are validated against strict contracts.
 * **Error Warehouse:** Failures are intercepted and logged sequentially to the `INGESTION_ERRORS` table, ensuring 100% thread safety and detailed stack trace persistence even during parallel runs.
 * **dbt Tests:** Generic and `dbt_utils` tests enforce both schema and logical consistency — surrogate key uniqueness, non-null spectral powers, an `accepted_values` contract on sleep stages, sleep efficiency bounded to 0–1, and cross-column invariants (*total sleep time cannot exceed the sleep period*; *stage percentages must sum to 1*).
+* **Fail-Fast Transformation:** The pipeline runs `dbt build`, which walks the DAG testing each model as it is created, so a model whose tests fail never has dependents built on top of it. Running every model first and testing afterwards would let bad data reach the marts before anything noticed. dbt output is streamed into the Prefect logs line by line rather than withheld until each command ends.
 
 ---
 
