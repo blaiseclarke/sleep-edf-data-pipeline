@@ -22,8 +22,19 @@ The architecture uses **MNE** for advanced signal processing, **Prefect** for or
 Explore sleep architecture and power ratios from the Sleep-EDF age study dataset. Queries dbt models directly from DuckDB.
 
 **Features:**
-*   **Subject Viewer**: Inspect individual recordings (Hypnogram, spectral power).
+*   **Subject Viewer**: Inspect individual recordings (hypnogram, sleep architecture, spectral power).
 *   **Clinical Metrics**: Total sleep time, sleep efficiency, awakenings, and sleep stage percentages, scoped to each subject's main sleep episode.
+*   **Accessible by construction**: see below.
+
+#### Accessibility
+
+The dashboard is built so that nothing is gated behind colour, motion, or a mouse:
+
+*   **Palettes are validated, not eyeballed.** Every colour is checked against colour-vision-deficiency simulation in both light and dark modes — worst adjacent CVD ΔE 9.2 (light) / 9.4 (dark) against a threshold of 8. The ordinal ramp is verified monotone in lightness and single-hue. Regression tests in `tests/test_viz.py` assert the contrast floors so a future palette edit cannot quietly break them.
+*   **Colour is never the only channel.** Every chart carries direct labels, a legend where there are two or more series, and a table view. An optional **pattern fill** toggle adds hatching to the sleep architecture bar for full colour blindness, greyscale printing, and forced-colors mode.
+*   **Contrast.** Body text clears WCAG AA against its surface (7.7:1 or better). In-segment labels are set at 19px bold — WCAG large text — because neither ink token clears 4.5:1 against the blue fill.
+*   **Dark mode is selected, not flipped.** The dark palette is its own set of steps chosen for the dark surface, and the charts follow the viewer's light/dark setting.
+*   **Motion and focus.** `prefers-reduced-motion` is respected and chart transitions are disabled outright; keyboard focus rings are restored at high contrast.
 
 ---
 
