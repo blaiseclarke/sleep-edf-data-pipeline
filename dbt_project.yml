@@ -16,6 +16,9 @@ clean-targets:
 
 vars:
   epoch_length_seconds: 30
+  # A continuous wake bout at least this long splits one sleep episode from the
+  # next, so that daytime naps are not folded into the main sleep period.
+  sleep_episode_gap_minutes: 60
 
 models:
   sleep_analytics:
