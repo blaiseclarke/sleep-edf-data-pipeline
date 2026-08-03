@@ -26,16 +26,6 @@ Explore sleep architecture and power ratios from the Sleep-EDF age study dataset
 *   **Clinical Metrics**: total sleep time, sleep efficiency, awakenings, and sleep stage percentages, scoped to each subject's main sleep episode.
 *   **Accessible by construction**: see below.
 
-#### Accessibility
-
-The dashboard is built so nothing is gated behind color, motion, or a mouse:
-
-*   **Palettes are validated, not eyeballed.** Every color is checked against color-vision-deficiency simulation in both light and dark modes: worst adjacent CVD ΔE is 9.2 (light) / 9.4 (dark) against a threshold of 8. The ordinal ramp is verified monotone in lightness and single-hue. Regression tests in `tests/test_viz.py` assert the contrast floors, so a future palette edit can't quietly break them.
-*   **Color is never the only channel.** Every chart has direct labels, a legend when there are two or more series, and a table view. An optional **pattern fill** toggle adds hatching to the sleep architecture bar for full color blindness, grayscale printing, and forced-colors mode.
-*   **Contrast.** Body text clears WCAG AA against its surface (7.7:1 or better). In-segment labels are 19px bold, which counts as WCAG large text, because neither ink token clears 4.5:1 against the blue fill.
-*   **Dark mode is selected, not flipped.** The dark palette is its own set of steps chosen for the dark surface, and the charts follow your light/dark setting.
-*   **Motion and focus.** `prefers-reduced-motion` is respected, chart transitions are disabled outright, and keyboard focus rings are restored at high contrast.
-
 > **On `data/sleep_data.db`.** The demo deploys straight from this repo and queries that file. Streamlit Cloud has no build step that could regenerate it, so the file is tracked (~21 MB) even though `.gitignore` excludes `data/` and `*.db` in general. There's an explicit negation in `.gitignore` to record that. Run `make demo-db` to rebuild it after changing a model. It builds into a fresh file, because DuckDB doesn't reclaim pages and rebuilding in place grows the artifact every time.
 
 ---
