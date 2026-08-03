@@ -24,7 +24,6 @@ Explore sleep architecture and power ratios from the Sleep-EDF age study dataset
 **Features:**
 *   **Subject Viewer**: dig into individual recordings (hypnogram, sleep architecture, spectral power).
 *   **Clinical Metrics**: total sleep time, sleep efficiency, awakenings, and sleep stage percentages, scoped to each subject's main sleep episode.
-*   **Accessible by construction**: see below.
 
 > **On `data/sleep_data.db`.** The demo deploys straight from this repo and queries that file. Streamlit Cloud has no build step that could regenerate it, so the file is tracked (~21 MB) even though `.gitignore` excludes `data/` and `*.db` in general. There's an explicit negation in `.gitignore` to record that. Run `make demo-db` to rebuild it after changing a model. It builds into a fresh file, because DuckDB doesn't reclaim pages and rebuilding in place grows the artifact every time.
 
